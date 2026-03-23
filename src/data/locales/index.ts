@@ -177,6 +177,29 @@ export interface Locale {
   lp_price_pro_name: string
   lp_price_pro_tag: string
   lp_price_pro_btn: string
+  // Auth pages
+  auth_signin_title: string
+  auth_signup_title: string
+  auth_subtitle: string
+  auth_signin_desc: string
+  auth_signup_desc: string
+  auth_email_label: string
+  auth_email_hint: string
+  auth_btn_get_code: string
+  auth_no_account: string
+  auth_create_account: string
+  auth_has_account: string
+  auth_login: string
+  auth_otp_title: string
+  auth_otp_subtitle: string
+  auth_otp_desc: string
+  auth_btn_verify: string
+  auth_no_code: string
+  auth_resend: string
+  auth_resend_in: string
+  auth_back: string
+  auth_back_home: string
+  auth_otp_error: string
 }
 
 // ── Section key → locale key map ─────────────────────────────────────────────

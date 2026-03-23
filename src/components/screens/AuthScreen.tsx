@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useApp } from '@/context/AppContext'
+import { useLanguage } from '@/context/LanguageContext'
 import type { Screen } from '@/types'
 
 const OTP_LENGTH = 8
@@ -14,6 +15,7 @@ interface AuthScreenProps {
 export default function AuthScreen({ mode: initialMode }: AuthScreenProps) {
   const { sendOtp, verifyOtp, user } = useAuth()
   const { setScreen }                = useApp()
+  const { t }                        = useLanguage()
 
   const [mode, setMode]     = useState(initialMode)
   const [step, setStep]     = useState<'email' | 'otp'>('email')
@@ -94,7 +96,7 @@ export default function AuthScreen({ mode: initialMode }: AuthScreenProps) {
     const { error: err } = await verifyOtp(email.trim(), token)
     setLoad(false)
     if (err) {
-      setError('Invalid code. Please try again.')
+      setError(t('auth_otp_error'))
       setDigits(Array(OTP_LENGTH).fill(''))
       triggerShake()
       setTimeout(() => inputRefs.current[0]?.focus(), 80)
@@ -119,7 +121,7 @@ export default function AuthScreen({ mode: initialMode }: AuthScreenProps) {
           <svg viewBox="0 0 14 14" fill="none" width="13" height="13">
             <path d="M9 12L4 7l5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Back
+          {t('auth_back_home')}
         </button>
 
         {/* ── Email step ── */}
@@ -134,18 +136,16 @@ export default function AuthScreen({ mode: initialMode }: AuthScreenProps) {
             </div>
 
             <h1 className="sg-title">
-              {mode === 'signin' ? 'Access your account' : 'Create your account'}
+              {mode === 'signin' ? t('auth_signin_title') : t('auth_signup_title')}
             </h1>
-            <h2 className="sg-subtitle">Get a code by email</h2>
+            <h2 className="sg-subtitle">{t('auth_subtitle')}</h2>
             <p className="sg-desc">
-              {mode === 'signin'
-                ? "We'll send a temporary code to confirm access."
-                : "We'll send a temporary code to confirm your registration."}
+              {mode === 'signin' ? t('auth_signin_desc') : t('auth_signup_desc')}
             </p>
 
             <form className="sg-form" onSubmit={handleSend}>
               <div className="sg-field">
-                <label className="sg-label">Email</label>
+                <label className="sg-label">{t('auth_email_label')}</label>
                 <input
                   ref={emailRef}
                   className="sg-input"
@@ -157,22 +157,22 @@ export default function AuthScreen({ mode: initialMode }: AuthScreenProps) {
                   required
                 />
                 <span className={`sg-hint${error ? ' sg-hint-err' : ''}`}>
-                  {error || 'Enter your email to continue.'}
+                  {error || t('auth_email_hint')}
                 </span>
               </div>
 
               <button type="submit" className="sg-btn" disabled={loading || !email.trim()}>
-                {loading ? <span className="sg-spin" /> : 'Get code'}
+                {loading ? <span className="sg-spin" /> : t('auth_btn_get_code')}
               </button>
             </form>
 
             <p className="sg-toggle">
-              {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+              {mode === 'signin' ? t('auth_no_account') : t('auth_has_account')}
               <button
                 className="sg-toggle-link"
                 onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
               >
-                {mode === 'signin' ? 'Create account' : 'Log in'}
+                {mode === 'signin' ? t('auth_create_account') : t('auth_login')}
               </button>
             </p>
           </>
@@ -188,10 +188,10 @@ export default function AuthScreen({ mode: initialMode }: AuthScreenProps) {
               </svg>
             </div>
 
-            <h1 className="sg-title">Check your email</h1>
-            <h2 className="sg-subtitle">Enter your verification code</h2>
+            <h1 className="sg-title">{t('auth_otp_title')}</h1>
+            <h2 className="sg-subtitle">{t('auth_otp_subtitle')}</h2>
             <p className="sg-desc">
-              We sent a {OTP_LENGTH}-digit code to{' '}
+              {t('auth_otp_desc').replace('{n}', String(OTP_LENGTH))}
               <strong style={{ color: 'var(--text)' }}>{email}</strong>
             </p>
 
@@ -222,14 +222,14 @@ export default function AuthScreen({ mode: initialMode }: AuthScreenProps) {
               onClick={() => submitOtp(digits.join(''))}
               disabled={loading || digits.some(d => !d)}
             >
-              {loading ? <span className="sg-spin" /> : 'Verify code'}
+              {loading ? <span className="sg-spin" /> : t('auth_btn_verify')}
             </button>
 
             <p className="sg-toggle">
-              Didn&apos;t receive it?{' '}
+              {t('auth_no_code')}
               {resend > 0
-                ? <span style={{ color: 'var(--text3)' }}>Resend in {resend}s</span>
-                : <button className="sg-toggle-link" onClick={handleResend}>Resend code</button>
+                ? <span style={{ color: 'var(--text3)' }}>{t('auth_resend_in').replace('{s}', String(resend))}</span>
+                : <button className="sg-toggle-link" onClick={handleResend}>{t('auth_resend')}</button>
               }
             </p>
 
@@ -237,7 +237,7 @@ export default function AuthScreen({ mode: initialMode }: AuthScreenProps) {
               className="sg-back"
               onClick={() => { setStep('email'); setError(''); setDigits(Array(OTP_LENGTH).fill('')) }}
             >
-              ← Back
+              {t('auth_back')}
             </button>
           </>
         )}
