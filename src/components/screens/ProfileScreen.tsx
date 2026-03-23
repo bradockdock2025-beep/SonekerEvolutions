@@ -290,6 +290,14 @@ export default function ProfileScreen() {
       {/* ── Sidebar ── */}
       <aside className="ap-sidebar">
 
+        {/* Back to home */}
+        <button className="ap-sb-back" onClick={() => setScreen('landing')}>
+          <svg viewBox="0 0 14 14" fill="none" width="12" height="12">
+            <path d="M9 12L4 7l5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Back
+        </button>
+
         {/* Identity */}
         <div className="ap-sb-identity">
           <div className="ap-sb-av">{user.initials}</div>

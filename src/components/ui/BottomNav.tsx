@@ -8,7 +8,7 @@ import type { Screen } from '@/types'
 export default function BottomNav() {
   const { screen, setScreen } = useApp()
   const { t } = useLanguage()
-  const { user, openAuth } = useAuth()
+  const { user } = useAuth()
 
   const activeId = screen === 'loading' ? 'landing' : screen
 
@@ -51,7 +51,7 @@ export default function BottomNav() {
           className={`bn${activeId === item.id ? ' on' : ''}`}
           onClick={() => {
             if (item.id === 'library' && !user) {
-              openAuth('signin', 'Sign in to access your saved analyses')
+              setScreen('signin')
             } else {
               setScreen(item.id)
             }

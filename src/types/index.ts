@@ -2,7 +2,7 @@ import type { SectionId } from '@/lib/schema'
 
 export type { SectionId }
 
-export type Screen = 'landing' | 'loading' | 'result' | 'library' | 'profile'
+export type Screen = 'landing' | 'loading' | 'result' | 'library' | 'profile' | 'signin' | 'signup'
 
 export type CardCategory = 'concept' | 'framework' | 'insight' | 'vocab' | 'idea'
 

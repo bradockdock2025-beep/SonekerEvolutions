@@ -74,13 +74,13 @@ function downloadText(content: string, filename: string, mime: string) {
 
 export default function ExportBar() {
   const { showToast } = useToast()
-  const { setMindMapOpen, result, saveAnalysis } = useApp()
+  const { setMindMapOpen, result, saveAnalysis, setScreen } = useApp()
   const { t } = useLanguage()
-  const { user, openAuth } = useAuth()
+  const { user } = useAuth()
 
   const handleSave = async () => {
     if (!result) { showToast(t('exp_toast_no_save')); return }
-    if (!user) { openAuth('signin', 'Sign in to save your analysis to your library'); return }
+    if (!user) { setScreen('signin'); return }
     try {
       await saveAnalysis()
       showToast(t('exp_toast_saved'))

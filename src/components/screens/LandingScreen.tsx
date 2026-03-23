@@ -140,7 +140,7 @@ function HeroMockup() {
 // ── User dropdown ─────────────────────────────────────────────────────────────
 
 function UserMenu() {
-  const { user, signOut, openAuth } = useAuth()
+  const { user, signOut } = useAuth()
   const { setScreen }               = useApp()
   const [open, setOpen]             = useState(false)
   const ref                         = useRef<HTMLDivElement>(null)
@@ -155,8 +155,8 @@ function UserMenu() {
 
   if (!user) return (
     <>
-      <button className="lp-nav-signin" onClick={() => openAuth('signin')}>Sign In</button>
-      <button className="lp-nav-cta"    onClick={() => openAuth('signup')}>Try Free</button>
+      <button className="lp-nav-signin" onClick={() => setScreen('signin')}>Sign In</button>
+      <button className="lp-nav-cta"    onClick={() => setScreen('signup')}>Try Free</button>
     </>
   )
 
