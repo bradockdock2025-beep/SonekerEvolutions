@@ -30,12 +30,25 @@ function toUser(sb: { id: string; email?: string; user_metadata?: { name?: strin
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
 
+  const bootstrap = (token: string) => {
+    fetch('/api/billing/bootstrap', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {/* non-critical */})
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) setUser(toUser(data.session.user))
+      if (data.session?.user) {
+        setUser(toUser(data.session.user))
+        bootstrap(data.session.access_token)
+      }
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ? toUser(session.user) : null)
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.access_token) {
+        bootstrap(session.access_token)
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -46,7 +59,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const verifyOtp = async (email: string, token: string) => {
-    const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
+    if (!error && data.session?.access_token) {
+      // Bootstrap customer + free subscription in the background
+      fetch('/api/billing/bootstrap', {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+      }).catch(() => {/* non-critical */})
+    }
     return { error: error?.message ?? null }
   }
 

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { supabaseAdmin }        from '@/lib/supabase-admin'
+import { getUserFromRequest }   from '@/lib/auth-server'
 
 export async function POST(req: NextRequest) {
+  const sbUser = await getUserFromRequest(req)
+  if (!sbUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   let body: Record<string, unknown>
   try {
     body = await req.json()
@@ -22,6 +26,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabaseAdmin
     .from('analyses')
     .insert({
+      user_id:       sbUser.id,
       video_id:      videoId,
       video_title:   videoTitle,
       channel:       channel ?? null,
@@ -42,12 +47,16 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ id: data.id })
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const sbUser = await getUserFromRequest(req)
+  if (!sbUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { data, error } = await supabaseAdmin
     .from('analyses')
     .select('id, created_at, video_id, video_title, channel, thumbnail_url, niche, card_count')
+    .eq('user_id', sbUser.id)
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(100)
 
   if (error) {
     console.error('Library fetch error:', error.message)

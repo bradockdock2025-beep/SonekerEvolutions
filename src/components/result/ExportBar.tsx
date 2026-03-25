@@ -74,13 +74,14 @@ function downloadText(content: string, filename: string, mime: string) {
 
 export default function ExportBar() {
   const { showToast } = useToast()
-  const { setMindMapOpen, result, saveAnalysis, setScreen } = useApp()
+  const { setMindMapOpen, result, saveAnalysis, savedId, isSaving, setScreen } = useApp()
   const { t } = useLanguage()
   const { user } = useAuth()
 
   const handleSave = async () => {
     if (!result) { showToast(t('exp_toast_no_save')); return }
     if (!user) { setScreen('signin'); return }
+    if (savedId || isSaving) return
     try {
       await saveAnalysis()
       showToast(t('exp_toast_saved'))
@@ -110,11 +111,44 @@ export default function ExportBar() {
 
   return (
     <div className="exp-bar">
-      <button className="exp-btn p" onClick={handleSave}>
+      <button className="exp-btn" onClick={() => setScreen('landing')}>
         <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-          <path d="M1 8.5V10h1.5l4.5-4.5-1.5-1.5L1 8.5zM9.4 2.1l-1.5-1.5a.5.5 0 00-.7 0L6.1 1.7l1.5 1.5 1.8-1.1z" fill="currentColor"/>
+          <path d="M1 5L5.5 1 10 5v5.5H7V8H4v2.5H1V5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
         </svg>
-        {t('exp_save')}
+        Home
+      </button>
+      <button className="exp-btn" onClick={() => setScreen('library')}>
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+          <path d="M2 2h7v8L5.5 8 2 10V2z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
+        </svg>
+        Library
+      </button>
+      <button className="exp-btn" onClick={() => setScreen('profile')}>
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+          <circle cx="5.5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.1"/>
+          <path d="M1 9.5c0-2.21 2.015-3.5 4.5-3.5s4.5 1.29 4.5 3.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+        </svg>
+        Account
+      </button>
+      <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '0 2px' }} />
+      <button
+        className={`exp-btn p${savedId ? ' exp-btn-saved' : ''}`}
+        onClick={handleSave}
+        disabled={isSaving}
+        title={savedId ? t('exp_toast_saved') : t('exp_save')}
+      >
+        {isSaving ? (
+          <span style={{ display: 'inline-block', width: 11, height: 11, border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .6s linear infinite' }} />
+        ) : savedId ? (
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <path d="M1.5 5.5l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : (
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <path d="M1 8.5V10h1.5l4.5-4.5-1.5-1.5L1 8.5zM9.4 2.1l-1.5-1.5a.5.5 0 00-.7 0L6.1 1.7l1.5 1.5 1.8-1.1z" fill="currentColor"/>
+          </svg>
+        )}
+        {savedId ? t('exp_toast_saved') : t('exp_save')}
       </button>
       <button className="exp-btn" onClick={handlePdf}>
         <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
@@ -157,3 +191,4 @@ export default function ExportBar() {
     </div>
   )
 }
+

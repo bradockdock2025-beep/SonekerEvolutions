@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/context/AuthContext'
-import { useApp } from '@/context/AppContext'
+import { useAuth }         from '@/context/AuthContext'
+import { useApp }          from '@/context/AppContext'
+import { useSubscription } from '@/context/SubscriptionContext'
+import { useLanguage }     from '@/context/LanguageContext'
 
 type ApTab = 'overview' | 'profile' | 'subscription' | 'billing' | 'feedback' | 'support'
 
@@ -51,15 +53,6 @@ const ISignOut = () => (
   </svg>
 )
 
-const NAV: { id: ApTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview',     label: 'Visão geral',        icon: <IGrid /> },
-  { id: 'profile',      label: 'Perfil',              icon: <IUser /> },
-  { id: 'subscription', label: 'Assinatura e plano',  icon: <ICard /> },
-  { id: 'billing',      label: 'Política de cobrança', icon: <IDoc /> },
-  { id: 'feedback',     label: 'Feedback',            icon: <IMail /> },
-  { id: 'support',      label: 'Suporte',             icon: <IPin /> },
-]
-
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
 function PageHead({ title, sub }: { title: string; sub: string }) {
@@ -102,12 +95,13 @@ function Row({
   )
 }
 
-function EditRow({
-  label, value, onSave,
-}: {
+function EditRow({ label, value, onSave, editLabel, saveLabel, cancelLabel }: {
   label: string
   value: string
   onSave: (v: string) => void
+  editLabel: string
+  saveLabel: string
+  cancelLabel: string
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft]     = useState(value)
@@ -117,16 +111,11 @@ function EditRow({
       <div className="ap-row ap-row-editing">
         <div className="ap-row-left" style={{ flex: 1 }}>
           <div className="ap-row-label">{label}</div>
-          <input
-            className="ap-edit-input"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            autoFocus
-          />
+          <input className="ap-edit-input" value={draft} onChange={e => setDraft(e.target.value)} autoFocus />
         </div>
         <div className="ap-edit-actions">
-          <button className="ap-edit-save" onClick={() => { onSave(draft); setEditing(false) }}>Salvar</button>
-          <button className="ap-edit-cancel" onClick={() => { setDraft(value); setEditing(false) }}>Cancelar</button>
+          <button className="ap-edit-save"   onClick={() => { onSave(draft); setEditing(false) }}>{saveLabel}</button>
+          <button className="ap-edit-cancel" onClick={() => { setDraft(value); setEditing(false) }}>{cancelLabel}</button>
         </div>
       </div>
     )
@@ -138,35 +127,124 @@ function EditRow({
         <div className="ap-row-label">{label}</div>
         <div className="ap-row-value">{value}</div>
       </div>
-      <button className="ap-row-action" onClick={() => setEditing(true)}>Editar</button>
+      <button className="ap-row-action" onClick={() => setEditing(true)}>{editLabel}</button>
     </div>
   )
 }
 
-function PlanCard({ onUpgrade }: { onUpgrade: () => void }) {
+// ── Dynamic plan card ─────────────────────────────────────────────────────────
+
+function PlanCard({ onUpgrade, onPortal }: { onUpgrade: () => void; onPortal: () => void }) {
+  const { subscription, isPaid, customer } = useSubscription()
+  const { t } = useLanguage()
+  const dateLocale = t('date_locale')
+  const planName = subscription?.plans?.name ?? t('ap_free_plan_name')
+
   return (
     <div className="ap-plan-card">
       <div>
-        <div className="ap-plan-eyebrow">PLANO ATUAL</div>
-        <div className="ap-plan-name">Gratuito</div>
-        <div className="ap-plan-desc">Plano gratuito</div>
+        <div className="ap-plan-eyebrow">{t('ap_current_plan')}</div>
+        <div className="ap-plan-name">{planName}</div>
+        {!isPaid && (
+          <div className="ap-plan-desc">
+            {customer?.free_usage_count ?? 0} / {customer?.free_limit ?? 3} {t('ap_free_usage')}
+          </div>
+        )}
+        {isPaid && subscription?.cancel_at_period_end && (
+          <div className="ap-plan-desc">{t('ap_cancels_end')}</div>
+        )}
+        {isPaid && !subscription?.cancel_at_period_end && subscription?.current_period_end && (
+          <div className="ap-plan-desc">
+            {t('ap_renews')} {new Date(subscription.current_period_end).toLocaleDateString(dateLocale)}
+          </div>
+        )}
       </div>
-      <button className="ap-plan-upgrade" onClick={onUpgrade}>Fazer upgrade →</button>
+      {isPaid
+        ? <button className="ap-plan-upgrade" onClick={onPortal}>{t('ap_manage_sub')}</button>
+        : <button className="ap-plan-upgrade" onClick={onUpgrade}>{t('ap_upgrade_btn')}</button>
+      }
+    </div>
+  )
+}
+
+// ── Upgrade modal ─────────────────────────────────────────────────────────────
+
+function UpgradeModal({ onClose }: { onClose: () => void }) {
+  const { plans, openCheckout } = useSubscription()
+  const { t } = useLanguage()
+  const paidPlans = plans.filter(p => p.slug !== 'free')
+
+  return (
+    <div className="up-overlay" onClick={onClose}>
+      <div className="up-modal" onClick={e => e.stopPropagation()}>
+        <button className="up-close" onClick={onClose}>✕</button>
+        <div className="up-title">{t('ap_up_title')}</div>
+        <div className="up-sub">{t('ap_up_sub')}</div>
+        <div className="up-plans">
+          {paidPlans.length === 0 && (
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t('ap_up_no_plans')}</p>
+          )}
+          {paidPlans.map(plan => {
+            const isAnnual  = plan.interval === 'year'
+            const localName = isAnnual ? t('plan_annual_name') : t('plan_monthly_name')
+            const features  = isAnnual
+              ? [t('plan_paid_f1'), t('plan_paid_f2'), t('plan_paid_f3'), t('plan_paid_f4'), t('plan_paid_f5'), t('plan_paid_f6'), t('plan_annual_f7')]
+              : [t('plan_paid_f1'), t('plan_paid_f2'), t('plan_paid_f3'), t('plan_paid_f4'), t('plan_paid_f5'), t('plan_paid_f6')]
+            return (
+              <div key={plan.id} className="up-plan-card">
+                {plan.discount_percent > 0 && (
+                  <div className="up-plan-badge">{t('ap_up_save')} {plan.discount_percent}%</div>
+                )}
+                <div className="up-plan-name">{localName}</div>
+                <div className="up-plan-price">
+                  ${plan.price.toFixed(2)}
+                  <span className="up-plan-interval">
+                    {isAnnual ? t('ap_per_year') : t('ap_per_month')}
+                  </span>
+                </div>
+                <ul className="up-plan-features">
+                  {features.map((f, i) => <li key={i}>{f}</li>)}
+                </ul>
+                <button className="up-plan-btn" onClick={() => openCheckout(plan.slug)}>
+                  {t('ap_up_start')} {localName}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 
-function OverviewSection({ user }: { user: { name: string; email: string } }) {
+function OverviewSection({ user, onUpgrade, onPortal }: {
+  user: { name: string; email: string }
+  onUpgrade: () => void
+  onPortal:  () => void
+}) {
+  const { customer, isPaid, usageLeft } = useSubscription()
+  const { t } = useLanguage()
+
   return (
     <>
-      <PageHead title="Visão geral" sub="Seu resumo de conta" />
-      <PlanCard onUpgrade={() => {}} />
-      <Card label="DETALHES DA CONTA">
-        <Row label="Nome" value={user.name} />
-        <Row label="E-mail" value={user.email} />
-        <Row label="Membro desde" value="março de 2026" />
+      <PageHead title={t('ap_overview_title')} sub={t('ap_overview_sub')} />
+      <PlanCard onUpgrade={onUpgrade} onPortal={onPortal} />
+      <Card label={t('ap_account_details')}>
+        <Row label={t('ap_label_name')}  value={user.name} />
+        <Row label={t('ap_label_email')} value={user.email} />
+        <Row
+          label={t('ap_analyses_available')}
+          value={isPaid
+            ? t('ap_unlimited')
+            : `${usageLeft} ${usageLeft === 1 ? t('ap_remaining_one') : t('ap_remaining_many')}`
+          }
+          highlight={!isPaid && usageLeft === 0}
+        />
+        {customer?.id && (
+          <Row label={t('ap_account_id')} value={customer.id.slice(0, 8) + '…'} />
+        )}
       </Card>
     </>
   )
@@ -178,137 +256,226 @@ function ProfileSection({ user, updateUser }: {
 }) {
   const [name, setName]   = useState(user.name)
   const [email, setEmail] = useState(user.email)
+  const { signOut }       = useAuth()
+  const { setScreen }     = useApp()
+  const { t }             = useLanguage()
 
   return (
     <>
-      <PageHead title="Perfil" sub="Gerencie suas informações pessoais" />
-
-      <Card label="INFORMAÇÕES PESSOAIS">
-        <EditRow label="Nome completo" value={name} onSave={v => { setName(v); updateUser(v, email) }} />
-        <EditRow label="E-mail" value={email} onSave={v => { setEmail(v); updateUser(name, v) }} />
-        <EditRow label="Nome de exibição" value={name} onSave={v => { setName(v); updateUser(v, email) }} />
+      <PageHead title={t('ap_profile_title')} sub={t('ap_profile_sub')} />
+      <Card label={t('ap_personal_info')}>
+        <EditRow
+          label={t('ap_full_name')}
+          value={name}
+          onSave={v => { setName(v); updateUser(v, email) }}
+          editLabel={t('ap_edit')}
+          saveLabel={t('ap_save')}
+          cancelLabel={t('ap_cancel')}
+        />
+        <EditRow
+          label={t('ap_label_email')}
+          value={email}
+          onSave={v => { setEmail(v); updateUser(name, v) }}
+          editLabel={t('ap_edit')}
+          saveLabel={t('ap_save')}
+          cancelLabel={t('ap_cancel')}
+        />
       </Card>
-
-      <Card label="FOTO DE PERFIL">
+      <Card label={t('ap_avatar_section')}>
         <div className="ap-row">
           <div className="ap-row-left">
-            <div className="ap-row-label">Avatar</div>
-            <div className="ap-row-value">Usando iniciais geradas</div>
+            <div className="ap-row-label">{t('ap_profile_pic')}</div>
+            <div className="ap-row-value">{t('ap_profile_pic_desc')}</div>
           </div>
           <div className="ap-avatar-row-right">
             <div className="ap-av-sm">{user.initials}</div>
-            <button className="ap-row-action">Alterar</button>
           </div>
         </div>
       </Card>
-
-      <Card label="SEGURANÇA">
-        <Row label="Senha" value="Atualize sua senha de acesso" action={() => {}} actionLabel="Alterar" />
-        <Row label="Sair" value="Encerrar sua sessão atual" action={() => {}} actionLabel="Sair" />
+      <Card label={t('ap_session_section')}>
+        <Row
+          label={t('ap_signout_label')}
+          value={t('ap_signout_desc')}
+          action={() => { signOut(); setScreen('landing') }}
+          actionLabel={t('ap_signout')}
+        />
       </Card>
     </>
   )
 }
 
-function SubscriptionSection() {
+function SubscriptionSection({ onUpgrade, onPortal }: { onUpgrade: () => void; onPortal: () => void }) {
+  const { subscription, customer, isPaid, plans, openCheckout } = useSubscription()
+  const { t } = useLanguage()
+  const dateLocale = t('date_locale')
+  const paidPlans = plans.filter(p => p.slug !== 'free')
+
+  const statusLabel: Record<string, string> = {
+    active:   t('ap_status_active'),
+    trialing: t('ap_status_trialing'),
+    past_due: t('ap_status_past_due'),
+    canceled: t('ap_status_canceled'),
+    free:     t('ap_status_free'),
+  }
+
   return (
     <>
-      <PageHead title="Assinatura e plano" sub="Gerencie sua assinatura e cobrança" />
-      <PlanCard onUpgrade={() => {}} />
-      <Card label="INFORMAÇÕES DE COBRANÇA">
-        <Row label="Método de pagamento" value="Nenhum cartão cadastrado" action={() => {}} actionLabel="Adicionar" />
-        <Row label="Status da assinatura" value="Plano gratuito" />
-        <EditRow label="Nome de cobrança" value="bradockdock2025" onSave={() => {}} />
-        <EditRow label="E-mail de cobrança" value="bradockdock2025@gmail.com" onSave={() => {}} />
-        <Row label="Política de cobrança" value="Cobrança recorrente, cancelamento, reembolsos e disputas de pagamento." action={() => {}} actionLabel="Ver" />
+      <PageHead title={t('ap_sub_title')} sub={t('ap_sub_sub')} />
+      <PlanCard onUpgrade={onUpgrade} onPortal={onPortal} />
+
+      {isPaid && (
+        <Card label={t('ap_sub_details')}>
+          <Row label={t('ap_status_label')} value={statusLabel[subscription?.status ?? ''] ?? subscription?.status ?? '—'} />
+          <Row label={t('ap_plan_label')}   value={subscription?.plans?.name ?? '—'} />
+          <Row
+            label={t('ap_period_label')}
+            value={subscription?.current_period_start && subscription?.current_period_end
+              ? `${new Date(subscription.current_period_start).toLocaleDateString(dateLocale)} → ${new Date(subscription.current_period_end).toLocaleDateString(dateLocale)}`
+              : '—'
+            }
+          />
+          <Row
+            label={t('ap_autorenew_label')}
+            value={subscription?.cancel_at_period_end ? t('ap_autorenew_off') : t('ap_autorenew_on')}
+          />
+          <Row
+            label={t('ap_portal_label')}
+            value={t('ap_portal_desc')}
+            action={onPortal}
+            actionLabel={t('ap_open_portal')}
+          />
+        </Card>
+      )}
+
+      {!isPaid && paidPlans.length > 0 && (
+        <Card label={t('ap_pro_plans')}>
+          {paidPlans.map(plan => {
+            const isAnnual = plan.interval === 'year'
+            const localName = isAnnual ? t('plan_annual_name') : t('plan_monthly_name')
+            const localDesc = isAnnual ? t('plan_annual_desc') : t('plan_monthly_desc')
+            return (
+              <div key={plan.id} className="ap-row">
+                <div className="ap-row-left">
+                  <div className="ap-row-label">
+                    {localName}
+                    {plan.discount_percent > 0 && (
+                      <span style={{ marginLeft: 8, color: 'var(--p)', fontSize: 11 }}>−{plan.discount_percent}%</span>
+                    )}
+                  </div>
+                  <div className="ap-row-value">
+                    ${plan.price.toFixed(2)}{isAnnual ? t('ap_per_year') : t('ap_per_month')} · {localDesc}
+                  </div>
+                </div>
+                <button className="ap-row-action" onClick={() => openCheckout(plan.slug)}>{t('ap_choose')}</button>
+              </div>
+            )
+          })}
+        </Card>
+      )}
+
+      <Card label={t('ap_billing_data')}>
+        <Row label={t('ap_billing_name')}  value={customer?.billing_name  || customer?.email || '—'} />
+        <Row label={t('ap_billing_email')} value={customer?.billing_email || customer?.email || '—'} />
       </Card>
     </>
   )
 }
 
 function BillingPolicySection() {
+  const { t } = useLanguage()
   return (
     <>
-      <PageHead title="Política de cobrança" sub="Regras claras para renovação, cancelamento, reembolso e disputas de pagamento." />
-      <Card label="COMO A SUA ASSINATURA FUNCIONA">
-        <Row
-          label="Cobrança recorrente"
-          value="As assinaturas pagas renovam automaticamente no período mensal ou anual escolhido até que as próximas renovações sejam canceladas."
-        />
-        <Row
-          label="Cancelamento"
-          value="O cancelamento interrompe apenas a próxima renovação. O acesso permanece ativo até o fim do período já pago."
-        />
-        <Row
-          label="Reembolsos"
-          value="Valores pagos não são reembolsáveis."
-        />
-        <Row
-          label="Disputas de pagamento"
-          value="Chargebacks e disputas ainda podem ser abertos junto ao emissor do cartão e seguem as regras da bandeira."
-        />
+      <PageHead title={t('ap_billing_title')} sub={t('ap_billing_sub')} />
+      <Card label={t('ap_billing_how')}>
+        <Row label={t('ap_billing_recurring')}     value={t('ap_billing_recurring_desc')} />
+        <Row label={t('ap_billing_cancel_label')}  value={t('ap_billing_cancel_desc')} />
+        <Row label={t('ap_billing_refund')}        value={t('ap_billing_refund_desc')} />
+        <Row label={t('ap_billing_dispute')}       value={t('ap_billing_dispute_desc')} />
       </Card>
     </>
   )
 }
 
 function FeedbackSection() {
+  const { t } = useLanguage()
   return (
     <>
-      <PageHead title="Feedback" sub="Envie sugestões, relate problemas ou compartilhe feedback do produto." />
-      <Card label="E-MAIL DE CONTATO">
-        <Row label="E-mail de feedback" value="feedback@soneker.com" action={() => {}} actionLabel="Enviar e-mail" />
-        <Row label="O que enviar" value="Use este canal para ideias de produto, bugs e feedback geral." />
+      <PageHead title={t('ap_feedback_title')} sub={t('ap_feedback_sub')} />
+      <Card label={t('ap_feedback_contact')}>
+        <Row
+          label={t('ap_feedback_label')}
+          value="feedback@soneker.com"
+          action={() => { window.location.href = 'mailto:feedback@soneker.com' }}
+          actionLabel={t('ap_feedback_send')}
+        />
+        <Row label={t('ap_feedback_what')} value={t('ap_feedback_what_desc')} />
       </Card>
     </>
   )
 }
 
 function SupportSection() {
+  const { t } = useLanguage()
   return (
     <>
-      <PageHead title="Suporte" sub="Obtenha ajuda com acesso, cobrança ou problemas da conta." />
-      <Card label="CONTATO DE SUPORTE">
-        <Row label="E-mail de suporte" value="support@soneker.com" action={() => {}} actionLabel="Contactar suporte" />
-        <Row label="Quando usar suporte" value="Use este canal para acesso à conta, assinatura, cobrança e pedidos de suporte técnico." />
+      <PageHead title={t('ap_support_title')} sub={t('ap_support_sub')} />
+      <Card label={t('ap_support_contact')}>
+        <Row
+          label={t('ap_support_label')}
+          value="support@soneker.com"
+          action={() => { window.location.href = 'mailto:support@soneker.com' }}
+          actionLabel={t('ap_support_contact_btn')}
+        />
+        <Row label={t('ap_support_when')} value={t('ap_support_when_desc')} />
       </Card>
     </>
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
+
 export default function ProfileScreen() {
   const { user, updateUser, signOut } = useAuth()
   const { setScreen }                 = useApp()
+  const { isPaid, openPortal }        = useSubscription()
+  const { t }                         = useLanguage()
   const [tab, setTab]                 = useState<ApTab>('overview')
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   if (!user) { setScreen('landing'); return null }
+
+  const NAV: { id: ApTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'overview',     label: t('ap_nav_overview'),     icon: <IGrid /> },
+    { id: 'profile',      label: t('ap_nav_profile'),      icon: <IUser /> },
+    { id: 'subscription', label: t('ap_nav_subscription'), icon: <ICard /> },
+    { id: 'billing',      label: t('ap_nav_billing'),      icon: <IDoc /> },
+    { id: 'feedback',     label: t('ap_nav_feedback'),     icon: <IMail /> },
+    { id: 'support',      label: t('ap_nav_support'),      icon: <IPin /> },
+  ]
+
+  const handleUpgrade = () => setShowUpgrade(true)
+  const handlePortal  = () => openPortal()
 
   return (
     <div className="ap-root">
 
-      {/* ── Sidebar ── */}
       <aside className="ap-sidebar">
-
-        {/* Back to home */}
         <button className="ap-sb-back" onClick={() => setScreen('landing')}>
           <svg viewBox="0 0 14 14" fill="none" width="12" height="12">
             <path d="M9 12L4 7l5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Back
+          {t('ap_back')}
         </button>
 
-        {/* Identity */}
         <div className="ap-sb-identity">
           <div className="ap-sb-av">{user.initials}</div>
           <div className="ap-sb-name">{user.name}</div>
           <div className="ap-sb-email">{user.email}</div>
-          <div className="ap-sb-badge">● Plano Gratuito</div>
+          <div className="ap-sb-badge">{isPaid ? t('ap_pro_badge') : t('ap_free_badge')}</div>
         </div>
 
-        {/* Nav */}
         <nav className="ap-sb-nav">
-          <div className="ap-sb-group">GERAL</div>
+          <div className="ap-sb-group">{t('ap_nav_general')}</div>
           {NAV.map(item => (
             <button
               key={item.id}
@@ -321,26 +488,20 @@ export default function ProfileScreen() {
           ))}
         </nav>
 
-        {/* Footer */}
         <div className="ap-sb-footer">
-          <button
-            className="ap-sb-signout"
-            onClick={() => { signOut(); setScreen('landing') }}
-          >
+          <button className="ap-sb-signout" onClick={() => { signOut(); setScreen('landing') }}>
             <ISignOut />
-            Sair
+            {t('ap_signout')}
           </button>
         </div>
-
       </aside>
 
-      {/* ── Content ── */}
       <main className="ap-main">
         <div className="ap-scroll">
           <div className="ap-inner">
-            {tab === 'overview'     && <OverviewSection user={user} />}
-            {tab === 'profile'      && <ProfileSection user={user} updateUser={updateUser} />}
-            {tab === 'subscription' && <SubscriptionSection />}
+            {tab === 'overview'     && <OverviewSection user={user} onUpgrade={handleUpgrade} onPortal={handlePortal} />}
+            {tab === 'profile'      && <ProfileSection  user={user} updateUser={updateUser} />}
+            {tab === 'subscription' && <SubscriptionSection onUpgrade={handleUpgrade} onPortal={handlePortal} />}
             {tab === 'billing'      && <BillingPolicySection />}
             {tab === 'feedback'     && <FeedbackSection />}
             {tab === 'support'      && <SupportSection />}
@@ -348,6 +509,7 @@ export default function ProfileScreen() {
         </div>
       </main>
 
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   )
 }

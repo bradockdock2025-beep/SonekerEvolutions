@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useRef } from 'react'
 import { useLanguage } from '@/context/LanguageContext'
+import { supabase } from '@/lib/supabase'
 import type { Screen, KnowledgeLensData, SmartSelectionData, AnalysisResult, DeepSearchResult } from '@/types'
 
 interface AppContextType {
@@ -27,6 +28,8 @@ interface AppContextType {
   // Library
   loadSavedAnalysis: (id: string) => void
   saveAnalysis: () => Promise<void>
+  savedId: string | null   // ID of the saved analysis (null = not saved yet)
+  isSaving: boolean
   // Map
   addConceptToMap: (term: string) => void
 }
@@ -45,6 +48,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [analysisReady, setAnalysisReady] = useState(false)
+  const [savedId, setSavedId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   const [deepSearch, setDeepSearch] = useState<DeepSearchResult | null>(null)
 
@@ -100,28 +105,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const saveAnalysis = async () => {
     if (!result) return
-    await fetch('/api/library', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        videoId:      result.videoId ?? '',
-        videoTitle:   result.videoTitle,
-        channel:      result.channel,
-        thumbnailUrl: result.thumbnailUrl,
-        niche:        result.niche,
-        nicheId:      result.nicheId,
-        cardCount:    result.cards.length,
-        result,
-      }),
-    })
+    setIsSaving(true)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const res = await fetch('/api/library', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          videoId:      result.videoId ?? '',
+          videoTitle:   result.videoTitle,
+          channel:      result.channel,
+          thumbnailUrl: result.thumbnailUrl,
+          niche:        result.niche,
+          nicheId:      result.nicheId,
+          cardCount:    result.cards.length,
+          result,
+        }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      const data = await res.json()
+      setSavedId(data.id ?? null)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  const loadSavedAnalysis = (id: string) => {
-    fetch(`/api/library/${id}`)
+  const loadSavedAnalysis = async (id: string) => {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+    fetch(`/api/library/${id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then(async res => {
         if (!res.ok) throw new Error('Not found')
         const data = await res.json()
         setResult({ ...data, mapNodes: [], mapEdges: [] })
+        setSavedId(id)
         setScreen('result')
       })
       .catch(err => console.error('Load analysis failed:', err))
@@ -129,7 +152,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const abortRef = useRef<AbortController | null>(null)
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
     if (!urlInput.trim()) return
 
     abortRef.current?.abort()
@@ -139,11 +162,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setResult(null)
     setAnalysisError(null)
     setAnalysisReady(false)
+    setSavedId(null)
     setScreen('loading')
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
 
     fetch('/api/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ url: urlInput.trim(), language }),
       signal: controller.signal,
     })
@@ -170,7 +200,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       result, analysisError, analysisReady,
       startAnalysis,
       deepSearch, triggerDeepSearch, closeDeepSearch,
-      saveAnalysis, loadSavedAnalysis, addConceptToMap,
+      saveAnalysis, loadSavedAnalysis, savedId, isSaving,
+      addConceptToMap,
     }}>
       {children}
     </AppContext.Provider>

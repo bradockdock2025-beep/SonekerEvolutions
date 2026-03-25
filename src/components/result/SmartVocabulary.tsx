@@ -20,8 +20,8 @@ export default function SmartVocabulary() {
   }
 
   const handleMouseLeave = (e: React.MouseEvent) => {
-    const related = e.relatedTarget as HTMLElement | null
-    if (related?.closest('.klens')) return   // moving into the lens — keep it open
+    const related = e.relatedTarget
+    if (related instanceof HTMLElement && related.closest('.klens')) return
     setLens(null)
   }
 

@@ -4,10 +4,17 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useApp } from '@/context/AppContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { useAuth } from '@/context/AuthContext'
+import { useSubscription } from '@/context/SubscriptionContext'
 import { extractVideoId } from '@/lib/youtube'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import LanguageSelector from '@/components/ui/LanguageSelector'
 import type { Locale } from '@/data/locales'
+
+interface PublicPlan {
+  id: string; name: string; slug: string; description: string
+  features: string[]; interval: string | null; price: number
+  currency: string; discount_percent: number; display_order: number
+}
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
@@ -54,23 +61,146 @@ const TESTIMONIALS = [
   { quote: 'The Deep Search and Knowledge Lens alone make this irreplaceable. I use it for every long-form video I watch.', name: 'Thomas Müller', role: 'Research Analyst', initials: 'TM', color: '--insight' },
 ]
 
-const FREE_FEATURES = [
-  'Unlimited video analyses',
-  'All 5 knowledge types',
-  'Interactive Knowledge Map',
-  'AI Deep Search',
-  'Export PDF · Markdown · SVG',
-  '5 languages',
-]
 
-const PRO_FEATURES = [
-  'Everything in Free',
-  'Notion sync',
-  'Batch processing',
-  'Priority AI model',
-  'Custom niche presets',
-  'Team workspace',
-]
+// ── Pricing Section ───────────────────────────────────────────────────────────
+
+function PricingSection({ heroInputRef }: { heroInputRef: React.RefObject<HTMLInputElement | null> }) {
+  const { user }                            = useAuth()
+  const { setScreen }                       = useApp()
+  const { openCheckout }                    = useSubscription()
+  const { t }                               = useLanguage()
+  const [interval, setIntervalMode]         = useState<'month' | 'year'>('month')
+  const [plans, setPlans]                   = useState<PublicPlan[]>([])
+  const [loading, setLoading]               = useState(true)
+
+  useEffect(() => {
+    fetch('/api/billing/plans')
+      .then(r => r.json())
+      .then(d => { setPlans(d.plans ?? []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const freePlan    = plans.find(p => p.slug === 'free')
+  const monthlyPlan = plans.find(p => p.slug === 'monthly')
+  const annualPlan  = plans.find(p => p.slug === 'annual')
+  const activePaid  = interval === 'month' ? monthlyPlan : annualPlan
+  const savings     = annualPlan?.discount_percent ?? 0
+
+  // Locale-translated content (overrides DB strings)
+  const freeFeatures   = [t('plan_free_f1'), t('plan_free_f2'), t('plan_free_f3'), t('plan_free_f4')]
+  const paidFeatures   = [t('plan_paid_f1'), t('plan_paid_f2'), t('plan_paid_f3'), t('plan_paid_f4'), t('plan_paid_f5'), t('plan_paid_f6')]
+  const annualFeatures = [...paidFeatures, t('plan_annual_f7')]
+
+  const paidName = interval === 'month' ? t('plan_monthly_name') : t('plan_annual_name')
+  const paidDesc = interval === 'month' ? t('plan_monthly_desc') : t('plan_annual_desc')
+
+  const handleFreeCta = () => heroInputRef.current?.focus()
+  const handlePaidCta = (slug: string) => {
+    if (!user) { setScreen('signup'); return }
+    openCheckout(slug)
+  }
+
+  const fmtPrice = (p: number) =>
+    '$' + p.toFixed(2)
+
+  return (
+    <section className="lp-section lp-price-section" id="pricing">
+      <div className="lp-section-inner">
+        <h2 className="lp-s-head">{t('pr_title')}</h2>
+        <p className="lp-s-sub">{t('pr_sub')}</p>
+
+        {/* Toggle */}
+        <div className="pr-toggle-wrap">
+          <div className="pr-toggle">
+            <button
+              className={`pr-toggle-btn${interval === 'month' ? ' pr-toggle-on' : ''}`}
+              onClick={() => setIntervalMode('month')}
+            >{t('pr_toggle_monthly')}</button>
+            <button
+              className={`pr-toggle-btn${interval === 'year' ? ' pr-toggle-on' : ''}`}
+              onClick={() => setIntervalMode('year')}
+            >
+              {t('pr_toggle_annual')}
+              {savings > 0 && (
+                <span className="pr-toggle-badge">{t('pr_save')} {savings}%</span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="pr-loading">{t('pr_loading')}</div>
+        ) : (
+          <div className="pr-grid">
+
+            {/* Free card */}
+            <div className="pr-card">
+              <div className="pr-card-top">
+                <div className="pr-plan-name">{t('plan_free_name')}</div>
+                <div className="pr-plan-desc">{t('plan_free_desc')}</div>
+              </div>
+              <div className="pr-price-wrap">
+                <span className="pr-price-currency">$</span>
+                <span className="pr-price-num">0</span>
+                <span className="pr-price-per">{interval === 'month' ? t('pr_per_month') : t('pr_per_year')}</span>
+              </div>
+              <ul className="pr-features">
+                {freeFeatures.map((f, i) => (
+                  <li key={i} className="pr-feature">
+                    <svg viewBox="0 0 14 14" fill="none" width="13" height="13"><path d="M2 7l3 3 7-7" stroke="var(--framework)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <button className="pr-btn pr-btn-free" onClick={handleFreeCta}>
+                {t('pr_free_cta')}
+              </button>
+            </div>
+
+            {/* Paid card */}
+            {activePaid && (
+              <div className="pr-card pr-card-pro">
+                {interval === 'year' && savings > 0 && (
+                  <div className="pr-card-ribbon">{t('pr_best_value')}</div>
+                )}
+                <div className="pr-card-top">
+                  <div className="pr-plan-name">{paidName}</div>
+                  <div className="pr-plan-desc">{paidDesc}</div>
+                </div>
+                <div className="pr-price-wrap">
+                  <span className="pr-price-currency">$</span>
+                  <span className="pr-price-num">
+                    {Number.isInteger(activePaid.price) ? activePaid.price : activePaid.price.toFixed(2)}
+                  </span>
+                  <span className="pr-price-per">{interval === 'month' ? t('pr_per_month') : t('pr_per_year')}</span>
+                </div>
+                {interval === 'year' && monthlyPlan && (
+                  <div className="pr-price-equiv">
+                    ≈ {fmtPrice(activePaid.price / 12)}/{t('pr_equiv')} {fmtPrice(monthlyPlan.price * 12)}{t('pr_per_year')}
+                  </div>
+                )}
+                <ul className="pr-features">
+                  {(interval === 'year' ? annualFeatures : paidFeatures).map((f, i) => (
+                    <li key={i} className="pr-feature">
+                      <svg viewBox="0 0 14 14" fill="none" width="13" height="13"><path d="M2 7l3 3 7-7" stroke="var(--p)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <button className="pr-btn pr-btn-pro" onClick={() => handlePaidCta(activePaid.slug)}>
+                  {user ? `${t('pr_paid_cta')} ${paidName}` : t('pr_signup_cta')}
+                </button>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        <p className="pr-footer-note">{t('pr_footer')}</p>
+      </div>
+    </section>
+  )
+}
 
 // ── Product mockup ────────────────────────────────────────────────────────────
 
@@ -425,61 +555,7 @@ export default function LandingScreen() {
       </section>
 
       {/* ── Pricing ─────────────────────────────────────────────────────── */}
-      <section className="lp-section lp-price-section">
-        <div className="lp-section-inner">
-          <h2 className="lp-s-head">{t('lp_price_label')}</h2>
-          <p className="lp-s-sub">{t('lp_price_sub')}</p>
-          <div className="lp-price-grid">
-            {/* Free tier */}
-            <div className="lp-price-card">
-              <div className="lp-price-head">
-                <span className="lp-price-name">{t('lp_price_free_name')}</span>
-                <span className="lp-price-tag">{t('lp_price_free_tag')}</span>
-              </div>
-              <div className="lp-price-amount">
-                <span className="lp-price-currency">$</span>
-                <span className="lp-price-num">0</span>
-                <span className="lp-price-per">/mo</span>
-              </div>
-              <ul className="lp-price-list">
-                {FREE_FEATURES.map((f, i) => (
-                  <li key={i} className="lp-price-item">
-                    <svg viewBox="0 0 14 14" fill="none" width="14" height="14"><path d="M2 7l3.5 3.5 6.5-6.5" stroke="var(--framework)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <button className="lp-price-btn lp-price-btn-free" onClick={() => heroInputRef.current?.focus()}>
-                {t('lp_price_free_btn')}
-              </button>
-            </div>
-            {/* Pro tier */}
-            <div className="lp-price-card lp-price-card-pro">
-              <div className="lp-price-pro-badge">Coming Soon</div>
-              <div className="lp-price-head">
-                <span className="lp-price-name">{t('lp_price_pro_name')}</span>
-                <span className="lp-price-tag lp-price-tag-pro">{t('lp_price_pro_tag')}</span>
-              </div>
-              <div className="lp-price-amount">
-                <span className="lp-price-currency">$</span>
-                <span className="lp-price-num">12</span>
-                <span className="lp-price-per">/mo</span>
-              </div>
-              <ul className="lp-price-list">
-                {PRO_FEATURES.map((f, i) => (
-                  <li key={i} className="lp-price-item">
-                    <svg viewBox="0 0 14 14" fill="none" width="14" height="14"><path d="M2 7l3.5 3.5 6.5-6.5" stroke="var(--p)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <button className="lp-price-btn lp-price-btn-pro">
-                {t('lp_price_pro_btn')}
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <PricingSection heroInputRef={heroInputRef} />
 
       {/* ── Final CTA ───────────────────────────────────────────────────── */}
       <section className="lp-cta-section">

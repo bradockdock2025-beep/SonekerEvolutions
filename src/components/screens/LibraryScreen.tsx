@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { useApp } from '@/context/AppContext'
+import { useApp }      from '@/context/AppContext'
 import { useLanguage } from '@/context/LanguageContext'
-import ThemeToggle from '@/components/ui/ThemeToggle'
+import { supabase }    from '@/lib/supabase'
+import ThemeToggle     from '@/components/ui/ThemeToggle'
 
 interface LibraryEntry {
   id: string
@@ -25,10 +26,20 @@ export default function LibraryScreen() {
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/library')
-      .then(r => r.json())
-      .then(data => { setEntries(Array.isArray(data) ? data : []); setLoading(false) })
-      .catch(() => setLoading(false))
+    let cancelled = false
+    const load = async () => {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const r = await fetch('/api/library', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (cancelled) return
+      const data = await r.json()
+      setEntries(Array.isArray(data) ? data : [])
+      setLoading(false)
+    }
+    load().catch(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [])
 
   const handleOpen = (id: string) => {

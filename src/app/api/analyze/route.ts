@@ -3,6 +3,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { AnalysisResponseSchema, type SectionId } from '@/lib/schema'
 import { buildSystemPrompt, TOOL_SCHEMA } from '@/lib/prompt'
 import { extractVideoId, getVideoMetadata, normalizeYoutubeUrl } from '@/lib/youtube'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getUserFromRequest } from '@/lib/auth-server'
 import type { Language } from '@/data/locales'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -208,8 +210,54 @@ async function fetchTranscript(videoId: string): Promise<string> {
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
+const FREE_USAGE_LIMIT = parseInt(process.env.FREE_USAGE_LIMIT ?? '3')
+
 export async function POST(req: NextRequest) {
   try {
+    // ── Auth + access control ──────────────────────────────────────────────
+    const sbUser = await getUserFromRequest(req)
+    if (!sbUser) {
+      return NextResponse.json({ message: 'Sign in to analyse videos.', code: 'UNAUTHENTICATED' }, { status: 401 })
+    }
+
+    const { data: customer } = await supabaseAdmin
+      .from('customers')
+      .select('id, free_usage_count, stripe_customer_id')
+      .eq('user_id', sbUser.id)
+      .maybeSingle()
+
+    if (!customer) {
+      return NextResponse.json({ message: 'Account not found. Please sign in again.', code: 'NO_CUSTOMER' }, { status: 403 })
+    }
+
+    // Check for an active paid subscription
+    const { data: paidSub } = await supabaseAdmin
+      .from('subscriptions')
+      .select('id, status')
+      .eq('customer_id', customer.id)
+      .in('status', ['active', 'trialing'])
+      .maybeSingle()
+
+    const isPaid = !!paidSub
+    const usageBefore = customer.free_usage_count
+
+    if (!isPaid && usageBefore >= FREE_USAGE_LIMIT) {
+      // Log blocked attempt
+      await supabaseAdmin.from('usage_logs').insert({
+        customer_id:  customer.id,
+        mode:         'free',
+        status:       'blocked',
+        usage_before: usageBefore,
+        usage_after:  usageBefore,
+      })
+      return NextResponse.json({
+        message: 'Free limit reached. Upgrade to Pro for unlimited analyses.',
+        code:    'FREE_LIMIT_REACHED',
+        limit:   FREE_USAGE_LIMIT,
+        used:    usageBefore,
+      }, { status: 403 })
+    }
+
     let body: { url?: string; language?: string }
     try { body = await req.json() } catch { return NextResponse.json({ message: 'Invalid request body' }, { status: 400 }) }
 
@@ -259,6 +307,23 @@ export async function POST(req: NextRequest) {
       console.error('Zod validation failed:', parsed.error.flatten())
       throw new ApiError(502, 'INVALID_ANALYSIS_DATA', `Invalid data: ${firstIssue?.path.join('.')} — ${firstIssue?.message}`)
     }
+
+    // ── Post-success: increment free usage + log ───────────────────────────
+    const usageAfter = isPaid ? usageBefore : usageBefore + 1
+    if (!isPaid) {
+      await supabaseAdmin
+        .from('customers')
+        .update({ free_usage_count: usageAfter })
+        .eq('id', customer.id)
+    }
+    await supabaseAdmin.from('usage_logs').insert({
+      customer_id:  customer.id,
+      mode:         isPaid ? 'paid' : 'free',
+      status:       'success',
+      usage_before: usageBefore,
+      usage_after:  usageAfter,
+      metadata:     { videoId, niche, language },
+    })
 
     return NextResponse.json({
       ...parsed.data,
