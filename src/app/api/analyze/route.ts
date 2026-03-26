@@ -13,7 +13,7 @@ const MODEL_CLASSIFY = 'claude-haiku-4-5-20251001'
 const MODEL_EXTRACT  = 'claude-sonnet-4-6'
 
 const MAX_URL_LENGTH = 500
-const TRANSCRIPT_CHAR_LIMIT = 100_000
+const TRANSCRIPT_CHAR_LIMIT = 40_000
 const MIN_TRANSCRIPT_CHARS = 100
 const MAX_RETRIES = 3
 const RETRY_BASE_DELAY_MS = 2000
@@ -290,7 +290,7 @@ export async function POST(req: NextRequest) {
     const response = await withRetry(() =>
       anthropic.messages.create({
         model: MODEL_EXTRACT,
-        max_tokens: 16000,
+        max_tokens: 8000,
         system: buildSystemPrompt(niche, nicheDisplayName, profile.core, profile.blocked, language),
         tools: [TOOL_SCHEMA],
         tool_choice: { type: 'tool', name: 'extract_knowledge_architecture' },
