@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useRef } from 'react'
+import { createContext, useContext, useState, useRef, useEffect } from 'react'
 import { useLanguage } from '@/context/LanguageContext'
 import { supabase } from '@/lib/supabase'
 import type { Screen, KnowledgeLensData, SmartSelectionData, AnalysisResult, DeepSearchResult } from '@/types'
@@ -152,8 +152,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const abortRef = useRef<AbortController | null>(null)
 
+  // Restore pending URL after login
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        const pending = localStorage.getItem('pending_url')
+        if (pending) {
+          localStorage.removeItem('pending_url')
+          setUrlInput(pending)
+          setScreen('landing')
+        }
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
   const startAnalysis = async () => {
     if (!urlInput.trim()) return
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+
+    // Not authenticated — save URL and redirect to sign in
+    if (!token) {
+      localStorage.setItem('pending_url', urlInput.trim())
+      setScreen('signin')
+      return
+    }
 
     abortRef.current?.abort()
     const controller = new AbortController()
@@ -164,9 +189,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAnalysisReady(false)
     setSavedId(null)
     setScreen('loading')
-
-    const { data: sessionData } = await supabase.auth.getSession()
-    const token = sessionData.session?.access_token
 
     fetch('/api/analyze', {
       method: 'POST',

@@ -90,9 +90,291 @@ export default function ExportBar() {
     }
   }
 
-  const handlePdf = () => {
+  const handlePdf = async () => {
     if (!result) { showToast(t('exp_toast_no_save')); return }
-    window.print()
+
+    const { default: jsPDF } = await import('jspdf')
+
+    // ── Page geometry ────────────────────────────────────────────
+    const PW = 210, PH = 297
+    const ML = 22, MR = 22, MT = 24, MB = 24
+    const CW = PW - ML - MR           // 166 mm content width
+    const SAFE = PH - MB - 12         // last safe Y before footer
+    const M = ML                      // shorthand used throughout
+
+    // ── Typography scale (pt) ────────────────────────────────────
+    const F = { brand:8, h1:21, h2:8.5, h3:13, body:10, detail:9, label:8.5, tag:8, foot:7.5 }
+
+    // Line-height in mm: pt * (25.4/72) * factor
+    const lh = (pt: number, f = 1.55) => pt * (25.4 / 72) * f
+
+    // ── Text sanitizer ───────────────────────────────────────────
+    const clean = (raw: string): string => {
+      const MAP: Record<string, string> = {
+        '\u2019': "'", '\u2018': "'", '\u201C': '"', '\u201D': '"',
+        '\u2014': '--', '\u2013': '-', '\u2022': '*', '\u00B7': '*',
+        '\u2026': '...', '\u00A0': ' ',
+        '\u2192': ' > ', '\u21D2': '=>', '\u2190': ' < ', '\u2194': '<>',
+        '\u00BB': '>>', '\u00AB': '<<',
+        '\u2713': 'v', '\u2714': 'v', '\u2715': 'x', '\u2716': 'x',
+        '\u2764': '<3', '\u2665': '<3',
+        '\u25B6': '>', '\u25C0': '<', '\u25BA': '>', '\u25CF': '*',
+      }
+      return raw
+        .replace(/<[^>]+>/g, '')
+        .replace(/[\r\n\t\f\v]+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/[^\x20-\x7E\xA0-\xFF]/g, c => MAP[c] ?? ' ')
+        .trim()
+    }
+
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+    let y = M
+
+    // ── Helpers ──────────────────────────────────────────────────
+    const newPage = () => { doc.addPage(); y = M }
+    // Guard: add page if less than `need` mm remain (capped at 50)
+    const guard = (need: number) => {
+      if (y + Math.min(need, 50) > PH - M - 8) newPage()
+    }
+
+    // Render wrapped text, returns height used
+    const put = (
+      raw: string, x: number, maxW: number,
+      size: number, style: 'normal' | 'bold' | 'italic',
+      r: number, g: number, b: number
+    ): number => {
+      const str = clean(raw)
+      if (!str) return 0
+      doc.setFontSize(size)
+      doc.setFont('helvetica', style)
+      doc.setTextColor(r, g, b)
+      const LH = size * 0.48        // line-height in mm
+      const lines = doc.splitTextToSize(str, maxW) as string[]
+      guard(lines.length * LH + 2)
+      doc.text(lines, x, y)
+      const h = lines.length * LH
+      y += h
+      return h
+    }
+
+    const hRule = (alpha = 210) => {
+      doc.setDrawColor(alpha, alpha, alpha + 10)
+      doc.setLineWidth(0.3)
+      doc.line(M, y, PW - M, y)
+    }
+
+    const sectionColor = (cat: string): [number,number,number,number,number,number] => {
+      // [text R,G,B,  bg R,G,B]
+      switch (cat) {
+        case 'concept':   return [85,  72,  224, 237, 235, 253]
+        case 'framework': return [15,  158, 118, 230, 250, 242]
+        case 'insight':   return [180, 110, 0,   252, 244, 225]
+        case 'vocab':     return [185, 40,  125, 252, 232, 244]
+        case 'idea':      return [200, 60,  60,  252, 235, 235]
+        default:          return [91,  78,  255, 237, 235, 253]
+      }
+    }
+
+    // ── PAGE 1: Cover / Header ────────────────────────────────────
+    // Soneker brand strip
+    doc.setFillColor(91, 78, 255)
+    doc.rect(M, y - 3, 3.5, 3.5, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(91, 78, 255)
+    doc.text('SONEKER', M + 5.5, y)
+    y += 8
+
+    // Video title — large
+    put(result.videoTitle, M, CW, 20, 'bold', 12, 12, 22)
+    y += 3
+
+    // Channel + Niche on one line
+    const meta = [result.channel, result.niche].filter(Boolean).join('   /   ')
+    put(meta, M, CW, 10, 'normal', 120, 120, 140)
+    y += 2
+
+    // AI summary line
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(91, 78, 255)
+    doc.text(
+      `AI Research Layer   ${result.cards.length} concepts extracted   ${result.vocabulary.length} vocabulary terms`,
+      M, y
+    )
+    y += 7
+
+    // Full-width rule
+    hRule(195)
+    y += 8
+
+    // ── CARDS ────────────────────────────────────────────────────
+    const sections = [...new Set(result.cards.map(c => c.section))]
+    let cardIndex = 0
+
+    for (const section of sections) {
+      const cards = result.cards.filter(c => c.section === section)
+      const [tr, tg, tb, bgR, bgG, bgB] = sectionColor(cards[0].category)
+
+      // Section header bar
+      guard(14)
+      doc.setFillColor(bgR, bgG, bgB)
+      doc.rect(M, y - 3, CW, 9, 'F')
+      // Colored left accent
+      doc.setFillColor(tr, tg, tb)
+      doc.rect(M, y - 3, 3, 9, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(tr, tg, tb)
+      doc.text(clean(cards[0].badge).toUpperCase(), M + 6, y + 2.5)
+      y += 12
+
+      for (const card of cards) {
+        cardIndex++
+        guard(18)
+
+        // Card number + title
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(7.5)
+        doc.setTextColor(tr, tg, tb)
+        doc.text(String(cardIndex).padStart(2, '0'), M, y + 0.5)
+
+        put(card.name, M + 7, CW - 7, 12, 'bold', 15, 15, 28)
+        y += 1.5
+
+        // Underline under title
+        doc.setDrawColor(tr, tg, tb)
+        doc.setLineWidth(0.4)
+        doc.line(M + 7, y, M + 7 + 40, y)
+        y += 4
+
+        // Body text
+        const body = clean(card.body)
+        if (body) {
+          put(body, M + 7, CW - 7, 10, 'normal', 45, 45, 65)
+          y += 3
+        }
+
+        // Tags row
+        if (card.tags.length) {
+          const tagStr = card.tags.map(tg2 => '#' + clean(tg2)).join('   ')
+          put(tagStr, M + 7, CW - 7, 7.5, 'normal', 150, 150, 170)
+          y += 3
+        }
+
+        // Deep panel
+        const rows = card.deepPanel.rows.filter(r => r.value || r.tags?.length)
+        if (rows.length) {
+          guard(10)
+
+          // Panel header
+          doc.setFillColor(245, 244, 250)
+          doc.rect(M + 7, y - 1, CW - 7, 5.5, 'F')
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(7.5)
+          doc.setTextColor(91, 78, 200)
+          doc.text(clean(card.deepPanel.title).toUpperCase(), M + 9, y + 3)
+          y += 7
+
+          for (const row of rows) {
+            const val = clean(row.value ?? row.tags?.join(', ') ?? '').trim()
+            if (!val) continue
+            const label = clean(row.label)
+
+            guard(16)
+
+            // Label on its own line (bold, muted)
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(8.5)
+            doc.setTextColor(80, 80, 112)
+            doc.text(label + ':', M + 10, y)
+            y += lh(8.5, 1.25)
+
+            // Value on next line(s), indented 4 mm
+            doc.setFont('helvetica', 'normal')
+            doc.setFontSize(9)
+            doc.setTextColor(45, 45, 68)
+            const valLines = doc.splitTextToSize(val, CW - 14) as string[]
+            guard(valLines.length * lh(9) + 2)
+            doc.text(valLines, M + 14, y)
+            y += valLines.length * lh(9) + 3.5
+          }
+          y += 2
+        }
+
+        // Card separator
+        hRule(225)
+        y += 7
+      }
+
+      y += 3
+    }
+
+    // ── VOCABULARY ───────────────────────────────────────────────
+    if (result.vocabulary.length) {
+      guard(18)
+
+      // Vocab section header
+      doc.setFillColor(237, 235, 253)
+      doc.rect(M, y - 3, CW, 9, 'F')
+      doc.setFillColor(91, 78, 255)
+      doc.rect(M, y - 3, 3, 9, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(91, 78, 255)
+      doc.text('VOCABULARY', M + 6, y + 2.5)
+      y += 12
+
+      for (let vi = 0; vi < result.vocabulary.length; vi++) {
+        const v = result.vocabulary[vi]
+        guard(16)
+
+        // Term
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(7.5)
+        doc.setTextColor(91, 78, 200)
+        doc.text(String(vi + 1).padStart(2, '0'), M, y + 0.5)
+        put(v.term, M + 7, CW - 7, 12, 'bold', 15, 15, 28)
+        y += 1.5
+
+        // Definition
+        put(v.definition, M + 7, CW - 7, 9.5, 'normal', 50, 50, 70)
+        y += 2
+
+        // Points
+        for (const pt of (v.points ?? [])) {
+          const ptClean = clean(pt)
+          if (!ptClean) continue
+          guard(6)
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(9)
+          doc.setTextColor(100, 100, 120)
+          const ptLines = doc.splitTextToSize('- ' + ptClean, CW - 12) as string[]
+          doc.text(ptLines, M + 10, y)
+          y += ptLines.length * 9 * 0.47 + 1
+        }
+
+        hRule(225)
+        y += 6
+      }
+    }
+
+    // ── Footer on every page ─────────────────────────────────────
+    const total = doc.getNumberOfPages()
+    for (let i = 1; i <= total; i++) {
+      doc.setPage(i)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7.5)
+      doc.setTextColor(180, 180, 195)
+      doc.text('Generated by Soneker', M, PH - 7)
+      doc.text(`${i} / ${total}`, PW - M, PH - 7, { align: 'right' })
+    }
+
+    // ── Download directly, no dialog ─────────────────────────────
+    const slug = clean(result.videoTitle).slice(0, 40).replace(/[^a-z0-9]/gi, '-').toLowerCase()
+    doc.save(`soneker-${slug}.pdf`)
+    showToast(t('topbar_toast_exported'))
   }
 
   const handleMarkdown = () => {
@@ -111,24 +393,21 @@ export default function ExportBar() {
 
   return (
     <div className="exp-bar">
-      <button className="exp-btn" onClick={() => setScreen('landing')}>
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+      <button className="exp-btn" title="Home" onClick={() => setScreen('landing')}>
+        <svg width="14" height="14" viewBox="0 0 11 11" fill="none">
           <path d="M1 5L5.5 1 10 5v5.5H7V8H4v2.5H1V5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
         </svg>
-        Home
       </button>
-      <button className="exp-btn" onClick={() => setScreen('library')}>
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+      <button className="exp-btn" title="Library" onClick={() => setScreen('library')}>
+        <svg width="14" height="14" viewBox="0 0 11 11" fill="none">
           <path d="M2 2h7v8L5.5 8 2 10V2z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
         </svg>
-        Library
       </button>
-      <button className="exp-btn" onClick={() => setScreen('profile')}>
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+      <button className="exp-btn" title="Account" onClick={() => setScreen('profile')}>
+        <svg width="14" height="14" viewBox="0 0 11 11" fill="none">
           <circle cx="5.5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.1"/>
           <path d="M1 9.5c0-2.21 2.015-3.5 4.5-3.5s4.5 1.29 4.5 3.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
         </svg>
-        Account
       </button>
       <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '0 2px' }} />
       <button
@@ -138,55 +417,51 @@ export default function ExportBar() {
         title={savedId ? t('exp_toast_saved') : t('exp_save')}
       >
         {isSaving ? (
-          <span style={{ display: 'inline-block', width: 11, height: 11, border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .6s linear infinite' }} />
+          <span style={{ display: 'inline-block', width: 13, height: 13, border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .6s linear infinite' }} />
         ) : savedId ? (
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+          <svg width="14" height="14" viewBox="0 0 11 11" fill="none">
             <path d="M1.5 5.5l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         ) : (
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-            <path d="M1 8.5V10h1.5l4.5-4.5-1.5-1.5L1 8.5zM9.4 2.1l-1.5-1.5a.5.5 0 00-.7 0L6.1 1.7l1.5 1.5 1.8-1.1z" fill="currentColor"/>
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+            <path d="M4 3h9l4 4v11a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+            <path d="M7 3v5h7V3M7 13h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         )}
-        {savedId ? t('exp_toast_saved') : t('exp_save')}
       </button>
-      <button className="exp-btn" onClick={handlePdf}>
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-          <path d="M2 1h5l2.5 2.5V10a.8.8 0 01-.8.8H2a.8.8 0 01-.8-.8V1.8A.8.8 0 012 1z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
-          <path d="M6.5 1v3h3M5.5 5.5v3M4 7l1.5 1.5L7 7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+      <button className="exp-btn" title={t('exp_pdf')} onClick={handlePdf}>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+          <path d="M4 2h9l5 5v11a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+          <path d="M13 2v6h6M10 11v5M7.5 13.5L10 16l2.5-2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        {t('exp_pdf')}
       </button>
-      <button className="exp-btn" onClick={handleCopy}>
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-          <rect x="3.5" y="3.5" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.1"/>
-          <path d="M1 7.5V1h6.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+      <button className="exp-btn" title={t('exp_copy')} onClick={handleCopy}>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+          <rect x="7" y="7" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+          <path d="M3 13V3h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
         </svg>
-        {t('exp_copy')}
       </button>
-      <button className="exp-btn" onClick={() => showToast(t('exp_toast_notion'), '→')}>
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-          <rect x="1" y="1" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.1"/>
-          <path d="M3.5 3.5h4M3.5 5.5h3M3.5 7.5h2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+      <button className="exp-btn" title={t('exp_notion')} onClick={() => showToast(t('exp_toast_notion'), '→')}>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+          <rect x="2" y="2" width="16" height="16" rx="3" stroke="currentColor" strokeWidth="1.4"/>
+          <path d="M6 7h8M6 10.5h6M6 14h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
         </svg>
-        {t('exp_notion')}
       </button>
-      <button className="exp-btn" onClick={handleMarkdown}>
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-          <path d="M1 3h9M1 5.5h5M1 8h7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+      <button className="exp-btn" title={t('exp_markdown')} onClick={handleMarkdown}>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+          <rect x="2" y="5" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+          <path d="M5.5 13V8l2.5 3 2.5-3v5M13 13l2-2.5-2-2.5M15 10.5h-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        {t('exp_markdown')}
       </button>
-      <button className="exp-btn" onClick={() => setMindMapOpen(true)}>
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-          <circle cx="5.5" cy="5.5" r="1.8" stroke="currentColor" strokeWidth="1.1"/>
-          <circle cx="1.5" cy="1.5" r=".9" stroke="currentColor" strokeWidth="1"/>
-          <circle cx="9.5" cy="1.5" r=".9" stroke="currentColor" strokeWidth="1"/>
-          <circle cx="1.5" cy="9.5" r=".9" stroke="currentColor" strokeWidth="1"/>
-          <circle cx="9.5" cy="9.5" r=".9" stroke="currentColor" strokeWidth="1"/>
-          <path d="M3.2 3.2l1 1M6.3 6.3l1 1M7.8 3.2l-1 1M4.7 6.3l-1 1" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+      <button className="exp-btn" title={t('exp_mindmap')} onClick={() => setMindMapOpen(true)}>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="3" stroke="currentColor" strokeWidth="1.4"/>
+          <circle cx="3" cy="3" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+          <circle cx="17" cy="3" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+          <circle cx="3" cy="17" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+          <circle cx="17" cy="17" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+          <path d="M4.5 4.5l4 4M11.5 11.5l4 4M15.5 4.5l-4 4M8.5 11.5l-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
         </svg>
-        {t('exp_mindmap')}
       </button>
     </div>
   )

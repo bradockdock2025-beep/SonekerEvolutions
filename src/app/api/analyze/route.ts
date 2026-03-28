@@ -290,7 +290,7 @@ export async function POST(req: NextRequest) {
     const response = await withRetry(() =>
       anthropic.messages.create({
         model: MODEL_EXTRACT,
-        max_tokens: 8000,
+        max_tokens: 12000,
         system: buildSystemPrompt(niche, nicheDisplayName, profile.core, profile.blocked, language),
         tools: [TOOL_SCHEMA],
         tool_choice: { type: 'tool', name: 'extract_knowledge_architecture' },

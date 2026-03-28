@@ -46,6 +46,7 @@ export interface Locale {
   nav_home: string
   nav_knowledge: string
   nav_library: string
+  nav_account: string
   // Theme
   theme_title: string
   // Topbar

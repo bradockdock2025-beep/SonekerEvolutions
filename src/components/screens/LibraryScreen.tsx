@@ -102,7 +102,7 @@ export default function LibraryScreen() {
                     alt={entry.video_title}
                     fill
                     sizes="200px"
-                    style={{ objectFit: 'cover', opacity: 0.7 }}
+                    style={{ objectFit: 'cover' }}
                     unoptimized
                   />
                 ) : (

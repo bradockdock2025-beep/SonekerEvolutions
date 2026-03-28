@@ -28,6 +28,7 @@ export const pt: Locale = {
   nav_home:           'Início',
   nav_knowledge:      'Conhecimento',
   nav_library:        'Biblioteca',
+  nav_account:        'Conta',
   // Theme
   theme_title:        'Alternar tema',
   // Topbar
