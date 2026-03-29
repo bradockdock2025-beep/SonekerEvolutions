@@ -50,6 +50,13 @@ export default function KnowledgeCard({ card }: Props) {
                 ))}
               </div>
 
+              {card.action && (
+                <div className="card-action-row">
+                  <span className="card-action-label">→</span>
+                  <span className="card-action-text">{card.action}</span>
+                </div>
+              )}
+
               <div className="btn-row">
                 <button className="btn-deep" onClick={e => { e.stopPropagation(); triggerDeepSearch(card.name) }}>
                   {t('card_explore')}

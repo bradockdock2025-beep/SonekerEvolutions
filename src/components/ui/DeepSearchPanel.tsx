@@ -4,8 +4,18 @@ import { useState } from 'react'
 import { useApp } from '@/context/AppContext'
 import { useLanguage } from '@/context/LanguageContext'
 
+function SaveIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M11 12H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h6.5L12 4.5V11a1 1 0 0 1-1 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+      <path d="M9 12V8H5v4" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+      <path d="M4 2v3h5" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 export default function DeepSearchPanel() {
-  const { deepSearch, closeDeepSearch, triggerDeepSearch } = useApp()
+  const { deepSearch, closeDeepSearch, triggerDeepSearch, saveDeepSearch, isSavingDeepSearch } = useApp()
   const { t } = useLanguage()
   const [copied, setCopied] = useState(false)
 
@@ -38,6 +48,25 @@ export default function DeepSearchPanel() {
             <span className="dsp-ai-dot" />
             <span className="dsp-label">AI Deep Search</span>
           </div>
+          {phase === 'done' && (
+            <button
+              className={`dsp-save${deepSearch?.savedId ? ' saved' : ''}`}
+              onClick={() => !deepSearch?.savedId && saveDeepSearch()}
+              disabled={isSavingDeepSearch || !!deepSearch?.savedId}
+              aria-label="Save"
+              title={deepSearch?.savedId ? 'Guardado na biblioteca' : 'Guardar na biblioteca'}
+            >
+              {deepSearch?.savedId ? (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2.5 7.5L5.5 10.5L11.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              ) : isSavingDeepSearch ? (
+                <div style={{ width: 12, height: 12, border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+              ) : (
+                <SaveIcon />
+              )}
+            </button>
+          )}
           <button className="dsp-copy" onClick={handleCopy} aria-label="Copy">
             {copied ? '✓' : (
               <svg width="13" height="13" viewBox="0 0 11 11" fill="none">

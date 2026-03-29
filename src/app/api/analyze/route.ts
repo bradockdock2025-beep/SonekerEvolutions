@@ -301,12 +301,18 @@ export async function POST(req: NextRequest) {
     const toolBlock = response.content.find(b => b.type === 'tool_use')
     if (!toolBlock || toolBlock.type !== 'tool_use') throw new ApiError(502, 'CLAUDE_NO_TOOL_OUTPUT', 'Claude did not return structured data')
 
+    // Diagnostic: log raw vocabulary from Claude before Zod parsing
+    const rawInput = toolBlock.input as Record<string, unknown>
+    const rawVocab = rawInput?.vocabulary
+    console.log(`[vocabulary] Claude returned ${Array.isArray(rawVocab) ? rawVocab.length : 'non-array'} items:`, JSON.stringify(rawVocab)?.slice(0, 500))
+
     const parsed = AnalysisResponseSchema.safeParse(toolBlock.input)
     if (!parsed.success) {
       const firstIssue = parsed.error.issues[0]
       console.error('Zod validation failed:', parsed.error.flatten())
       throw new ApiError(502, 'INVALID_ANALYSIS_DATA', `Invalid data: ${firstIssue?.path.join('.')} — ${firstIssue?.message}`)
     }
+    console.log(`[vocabulary] After Zod: ${parsed.data.vocabulary.length} items`)
 
     // ── Post-success: increment free usage + log ───────────────────────────
     const usageAfter = isPaid ? usageBefore : usageBefore + 1

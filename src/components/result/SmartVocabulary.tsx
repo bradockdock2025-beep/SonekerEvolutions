@@ -1,44 +1,58 @@
 'use client'
 
+import { useState, useRef } from 'react'
 import { useApp } from '@/context/AppContext'
 import type { VocabEntry } from '@/types'
 
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="14" height="14" viewBox="0 0 14 14" fill="none"
+      style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', flexShrink: 0 }}
+    >
+      <path d="M2.5 5L7 9.5L11.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function VocabCard({ entry }: { entry: VocabEntry }) {
+  const [open, setOpen] = useState(false)
+  const bodyRef = useRef<HTMLDivElement>(null)
+
+  return (
+    <div className={`vc${open ? ' vc-open' : ''}`}>
+      <button className="vc-header" onClick={() => setOpen(v => !v)}>
+        <div className="vc-header-left">
+          <span className="vc-badge">termo</span>
+          <span className="vc-term">{entry.term}</span>
+        </div>
+        <span className="vc-chevron">
+          <ChevronIcon open={open} />
+        </span>
+      </button>
+
+      <div
+        className="vc-body-wrap"
+        style={{ maxHeight: open ? (bodyRef.current?.scrollHeight ?? 400) + 'px' : '0px' }}
+      >
+        <div className="vc-body" ref={bodyRef}>
+          <p className="vc-def">{entry.definition}</p>
+          {entry.points && entry.points.length > 0 && (
+            <ul className="vc-pts">
+              {entry.points.map((pt, i) => (
+                <li key={i} className="vc-pt">{pt}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SmartVocabulary() {
-  const { setLens, lens, result } = useApp()
-
+  const { result } = useApp()
   const vocabulary: VocabEntry[] = result?.vocabulary ?? []
-
-  const handleMouseEnter = (entry: VocabEntry, e: React.MouseEvent) => {
-    const rect = (e.target as HTMLElement).getBoundingClientRect()
-    setLens({
-      term: entry.term,
-      definition: entry.definition,
-      points: entry.points,
-      x: rect.left,
-      y: rect.top - 10,
-    })
-  }
-
-  const handleMouseLeave = (e: React.MouseEvent) => {
-    const related = e.relatedTarget
-    if (related instanceof HTMLElement && related.closest('.klens')) return
-    setLens(null)
-  }
-
-  const handleTap = (entry: VocabEntry, e: React.MouseEvent) => {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    if (lens?.term === entry.term) {
-      setLens(null)
-    } else {
-      setLens({
-        term: entry.term,
-        definition: entry.definition,
-        points: entry.points,
-        x: rect.left,
-        y: rect.top - 10,
-      })
-    }
-  }
 
   return (
     <div className="kmap-block" style={{ borderBottom: '1px solid var(--border)' }}>
@@ -47,27 +61,22 @@ export default function SmartVocabulary() {
           <span className="blk-dot" style={{ background: 'var(--vocab)' }} />
           Smart Vocabulary
         </div>
-        <span className="kmap-hint">hover para definição rápida</span>
+        {vocabulary.length > 0 && (
+          <span className="kmap-hint">{vocabulary.length} termos</span>
+        )}
       </div>
-      {vocabulary.length === 0 && (
+
+      {vocabulary.length === 0 ? (
         <div style={{ padding: '10px 0 4px', fontSize: 11.5, color: 'var(--text3)' }}>
           Vocabulário disponível após análise.
         </div>
+      ) : (
+        <div className="vc-list">
+          {vocabulary.map(entry => (
+            <VocabCard key={entry.term} entry={entry} />
+          ))}
+        </div>
       )}
-      <div className="vocab-grid">
-        {vocabulary.map(entry => (
-          <div
-            key={entry.term}
-            className="vocab-pill"
-            onMouseEnter={e => handleMouseEnter(entry, e)}
-            onMouseLeave={handleMouseLeave}
-            onClick={e => handleTap(entry, e)}
-          >
-            <span className="vocab-pill-dot" />
-            {entry.term}
-          </div>
-        ))}
-      </div>
     </div>
   )
 }

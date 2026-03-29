@@ -9,6 +9,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: 'Tese Central',
     body: 'Um playbook detalhado de como <mark>David Park</mark> construiu um app de IA de $10 milhões anuais usando uma estratégia sistemática de vídeos curtos no TikTok e Instagram, focando em distribuição, conversão e retenção.',
     tags: ['Negócios / Finanças', 'Educação / Tutorial', 'Confiança 95%'],
+    action: 'Identifica os 3 pilares onde o teu negócio está mais fraco (Distribuição, Conversão ou Retenção) e define uma métrica específica para medir cada um esta semana.',
     deepPanel: {
       title: 'Resumo Executivo',
       rows: [
@@ -28,6 +29,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: 'Fórmula de Crescimento — 3 Pilares',
     body: 'O crescimento de startup deve ser pensado em três pilares: <mark>Distribuição</mark> + <mark class="mt">Conversão</mark> + <mark class="ma">Retenção</mark> = crescimento sustentável. Mesmo dominando apenas um pilar, é possível construir um negócio lucrativo.',
     tags: ['Distribuição', 'Conversão', 'Retenção', 'Growth'],
+    action: 'Mapeia em papel os teus actuais canais de distribuição, taxa de conversão e retenção mensal — identifica qual dos 3 pilares está abaixo de 50% do potencial.',
     deepPanel: {
       title: 'Conhecimento Conceitual',
       rows: [
@@ -47,6 +49,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: '3 Citações-Chave de David Park',
     body: '<mark class="ma">"Viralidade verdadeira é infectar as pessoas que você realmente queria que vissem seu conteúdo."</mark>',
     tags: ['Viral Marketing', 'Influenciadores', 'Maximização'],
+    action: 'Escreve a tua própria definição de "viralidade verdadeira" para o teu produto — qual é o público específico que precisas de infectar e onde essas pessoas passam o tempo online.',
     deepPanel: {
       title: 'Citações e Frases-Chave',
       rows: [
@@ -65,6 +68,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: 'Sequência: Pesquisa → Exploração → Maximização',
     body: 'O conteúdo segue uma lógica progressiva de 4 blocos. Começa nos fundamentos do framework, avança para pesquisa de audiência, estratégias de contacto com influenciadores e termina na maximização do conteúdo viral.',
     tags: ['4 Blocos', 'Progressivo', 'Accionável'],
+    action: 'Pergunta aos teus próximos 5 utilizadores quais influenciadores e conteúdos seguem — regista os handles e analisa padrões comuns antes de criar qualquer campanha.',
     deepPanel: {
       title: 'Estrutura Narrativa',
       rows: [
@@ -85,6 +89,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: 'Conclusões, Recomendações e Tendências',
     body: 'Marketing de influenciador funciona melhor com <mark>relacionamentos de longo prazo</mark>. Autenticidade e personalização são cruciais para o sucesso. Consistência e persistência vencem talento natural.',
     tags: ['Conclusões', 'Tendências', 'Insights Ocultos'],
+    action: 'Lista 3 micro-influenciadores (menos de 10k seguidores) no teu nicho e contacta-os esta semana com uma proposta de parceria baseada em performance, não em pagamento fixo.',
     deepPanel: {
       title: 'Conhecimento Derivado',
       rows: [
@@ -103,6 +108,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: 'Evidências Reais e Mensuráveis',
     body: 'Jenny AI: <mark>$10M anuais</mark>, 5M utilizadores. Série \'Point of View\': centenas de milhões de views, milhares de utilizadores pagos. Conta com <mark class="mt">48 seguidores superou conta com 55k</mark> em conversão real.',
     tags: ['Jenny AI', 'Point of View', 'Conversão real'],
+    action: 'Cria um coupon code único para o teu próximo influenciador e configura UTM links para medir conversões reais — elimina qualquer parceria que não gere utilizadores pagos em 30 dias.',
     deepPanel: {
       title: 'Validação e Evidências',
       rows: [
@@ -121,6 +127,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: '3 Perguntas Profundas para Reflexão',
     body: 'Como posso entender melhor a minha audiência além de métricas básicas? Que tipo de conteúdo realmente ressoa com o meu público específico? Como criar incentivos genuinamente alinhados com criadores?',
     tags: ['Reflexão', 'Perspectivas Alternativas', 'Conexões'],
+    action: 'Entrevista 3 utilizadores actuais esta semana com uma única pergunta: "Que conteúdo no Instagram ou TikTok te convenceu a experimentar produtos novos?" — regista as respostas e identifica padrões.',
     deepPanel: {
       title: 'Conhecimento Reflexivo',
       rows: [
@@ -140,6 +147,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: '5 Perguntas-Chave com Respostas Completas',
     body: 'Qual é o framework principal? Como fazer pesquisa inicial? Como estruturar deals? Como maximizar um viral? Quais os erros mais comuns com influenciadores?',
     tags: ['5 Q&A', 'Framework', 'Influenciadores', 'Erros'],
+    action: 'Prepara um template de DM personalizado (máximo 3 linhas) que demonstra que conheces o conteúdo do influenciador — envia para 10 criadores hoje e regista as taxas de resposta.',
     deepPanel: {
       title: 'Perguntas e Respostas',
       rows: [
@@ -159,6 +167,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: 'Quando Aplicar e Quando NÃO Aplicar',
     body: 'Aplicar quando: produto com <mark>audiência definida nas redes sociais</mark>, orçamentos limitados de marketing, produtos que podem ser demonstrados visualmente.',
     tags: ['Aplicabilidade', 'Pré-requisitos', 'Limitações'],
+    action: 'Confirma se o teu produto passa nos 3 pré-requisitos: audiência activa em redes sociais, produto demonstrável visualmente, e capacidade de medir conversões — se falhar num, resolve-o antes de investir em influenciadores.',
     deepPanel: {
       title: 'Contextos Importantes',
       rows: [
@@ -176,6 +185,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: '4 Termos Especializados',
     body: '<mark>UGC</mark> · <mark>UTM links</mark> · <mark>Shadowban</mark> · <mark class="mt">Teto vs Piso</mark> — os termos técnicos essenciais para dominar a estratégia de distribuição via influenciadores.',
     tags: ['UGC', 'UTM', 'Shadowban', 'Teto vs Piso'],
+    action: 'Configura UTM links para todos os teus canais de aquisição actuais e verifica qual gera mais conversões reais — elimina os canais com pior performance e duplica o investimento no melhor.',
     deepPanel: {
       title: 'Vocabulário',
       rows: [
@@ -194,6 +204,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: '3 Conceitos Fundamentais',
     body: '<mark>Framework dos 3 Pilares</mark> — estrutura base do crescimento. <mark class="mt">Pesquisa de Ingredientes</mark> — evita meses de iteração. <mark class="ma">Maximização de Viral</mark> — multiplica ROI do que já funciona.',
     tags: ['3 Pilares', 'Pesquisa de Ingredientes', 'Maximização Viral'],
+    action: 'Identifica o teu melhor conteúdo ou parceria dos últimos 6 meses e cria uma série de 5 variações baseadas nesse formato — publica 2 por semana durante o próximo mês.',
     deepPanel: {
       title: 'Conceitos-Chave',
       rows: [
@@ -211,6 +222,7 @@ export const MOCK_CARDS: KnowledgeCard[] = [
     name: 'Top Lições + Ordem de Implementação + Erros Comuns',
     body: '1. Pesquise a audiência antes de criar qualquer conteúdo. 2. Estruture deals com <mark class="mt">incentivos alinhados</mark>. 3. Transforme sucessos em séries replicáveis.',
     tags: ['Top Lições', 'Implementação', 'Erros Comuns', 'Ganhos Rápidos'],
+    action: 'Executa as 3 acções desta semana por ordem: (1) pesquisa 10 handles de utilizadores, (2) contacta 5 influenciadores com proposta de performance, (3) replica o teu melhor conteúdo em 3 variações.',
     deepPanel: {
       title: 'Playbook de Lições',
       rows: [
@@ -278,64 +290,84 @@ export const MAP_NODE_DATA: Record<string, NodeData> = {
     id: 'lean',
     title: 'Lean Startup',
     category: 'concept',
-    definition: 'Metodologia para construir e lançar produtos com ciclos rápidos de validação, minimizando desperdício e maximizando aprendizagem.',
-    points: ['Baseado no ciclo Build-Measure-Learn', 'Foca em hipóteses testáveis', 'Prioriza aprendizagem validada'],
-    relatedTags: ['Eric Ries', 'Startup', 'Agile', 'MVP'],
+    role: 'entry point',
+    centralQuestion: 'Como construir produtos que as pessoas querem sem desperdiçar recursos?',
+    connections: [
+      { label: 'MVP', relationship: 'produces' },
+      { label: 'Build-Measure-Learn', relationship: 'activates' },
+    ],
   },
   mvp: {
     id: 'mvp',
     title: 'MVP',
     category: 'vocab',
-    definition: 'Minimum Viable Product — a versão mais simples do produto que permite testar a hipótese central com utilizadores reais.',
-    points: ['Reduz tempo até validação', 'Foca no valor essencial', 'Evita construir o que não é necessário'],
-    relatedTags: ['Validação', 'Lean', 'Produto'],
+    role: 'catalyst',
+    centralQuestion: 'Qual é a versão mais simples do produto que valida a hipótese central?',
+    connections: [
+      { label: 'Product Validation', relationship: 'enables' },
+      { label: 'Build-Measure-Learn', relationship: 'requires' },
+    ],
   },
   bml: {
     id: 'bml',
     title: 'Build-Measure-Learn',
     category: 'framework',
-    definition: 'O ciclo central do Lean Startup: construir um MVP, medir com dados reais, aprender e repetir.',
-    points: ['Ciclo iterativo e contínuo', 'Minimiza o desperdício de recursos', 'Orienta decisões com dados'],
-    relatedTags: ['Iteração', 'Métricas', 'Aprendizagem'],
+    role: 'core mechanism',
+    centralQuestion: 'Como iterar rapidamente com base em dados reais do mercado?',
+    connections: [
+      { label: 'Product Market Fit', relationship: 'produces' },
+      { label: 'Pivot', relationship: 'validates' },
+    ],
   },
   pmf: {
     id: 'pmf',
     title: 'Product Market Fit',
     category: 'concept',
-    definition: 'O momento em que o produto satisfaz as necessidades do mercado tão bem que o crescimento se torna orgânico.',
-    points: ['Indicador de crescimento sustentável', 'Mede-se por retenção e recomendação', 'Ponto de viragem para escalar'],
-    relatedTags: ['Crescimento', 'Retenção', 'Mercado'],
+    role: 'result',
+    centralQuestion: 'Como saber que o produto satisfaz o mercado a ponto de crescer organicamente?',
+    connections: [
+      { label: 'Growth', relationship: 'activates' },
+      { label: 'Traction', relationship: 'produces' },
+    ],
   },
   validation: {
     id: 'validation',
     title: 'Product Validation',
     category: 'framework',
-    definition: 'Processo sistemático de confirmar que o produto resolve um problema real para um mercado real.',
-    points: ['Baseado em dados, não opiniões', 'Inclui entrevistas e testes', 'Precede a construção completa'],
-    relatedTags: ['Hipótese', 'Dados', 'Utilizadores'],
+    role: 'measure',
+    centralQuestion: 'Como confirmar que um problema real existe antes de construir a solução?',
+    connections: [
+      { label: 'Product Market Fit', relationship: 'enables' },
+    ],
   },
   pivot: {
     id: 'pivot',
     title: 'Pivot',
     category: 'insight',
-    definition: 'Mudança estratégica de direcção baseada em aprendizagem validada, preservando o que funciona.',
-    points: ['Baseado em evidências reais', 'Não é desistir — é ajustar', 'Requer coragem e clareza'],
-    relatedTags: ['Estratégia', 'Adaptação', 'Dados'],
+    role: 'catalyst',
+    centralQuestion: 'Quando mudar de direcção estratégica sem abandonar o que já foi aprendido?',
+    connections: [
+      { label: 'Build-Measure-Learn', relationship: 'requires' },
+    ],
   },
   growth: {
     id: 'growth',
     title: 'Growth',
     category: 'framework',
-    definition: 'Crescimento sustentável e escalável alcançado após validar o product-market fit.',
-    points: ['Requer PMF estabelecido', 'Combina os 3 pilares: D+C+R', 'Mede-se por métricas de negócio'],
-    relatedTags: ['Escalar', 'PMF', 'Sustentável'],
+    role: 'result',
+    centralQuestion: 'Como escalar de forma sustentável depois de validar o product-market fit?',
+    connections: [
+      { label: 'Traction', relationship: 'measures' },
+    ],
   },
   traction: {
     id: 'traction',
     title: 'Traction',
     category: 'insight',
-    definition: 'Evidência quantitativa de que o produto está a crescer de forma sustentável no mercado.',
-    points: ['Valida o product-market fit', 'Atrai investidores', 'Define o ritmo de escala'],
-    relatedTags: ['Métricas', 'Crescimento', 'Investimento'],
+    role: 'measure',
+    centralQuestion: 'Como provar com dados que o produto está a crescer de forma sustentável?',
+    connections: [
+      { label: 'Growth', relationship: 'validates' },
+    ],
   },
 }

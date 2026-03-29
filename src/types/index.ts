@@ -20,6 +20,7 @@ export type KnowledgeCard = {
   name: string
   body: string         // HTML string with <mark> tags
   tags: string[]
+  action: string       // MANDATORY: concrete action step — always present, always specific
   deepPanel: {
     title: string
     rows: DeepRow[]
@@ -53,11 +54,14 @@ export type MapEdge = {
 
 export type MapConceptRaw = {
   id: string
-  label: string
+  label: string                              // 1-3 words — node graphic label
   category: CardCategory | 'central'
-  isRoot?: boolean
-  connections?: string[]
-  connectionLabels?: Record<string, string>
+  isRoot: boolean
+  connections: string[]                      // IDs of connected concepts
+  connectionLabels?: Record<string, string>  // relationship verb for each connection
+  role: string                               // position in the system: "entry point", "core mechanism", "enabler", "blocker", "result", "measure", "catalyst"
+  centralQuestion: string                    // the ONE question this concept answers in the system
+  // legacy fields — kept for backward compat with old saved analyses
   definition?: string
   keyPoints?: string[]
 }
@@ -90,9 +94,9 @@ export type NodeData = {
   id: string
   title: string
   category: CardCategory | 'central'
-  definition: string
-  points: string[]
-  relatedTags: string[]
+  role: string
+  centralQuestion: string
+  connections: { label: string; relationship: string }[]
 }
 
 export type KnowledgeLensData = {
@@ -122,4 +126,14 @@ export type DeepSearchResult = {
   related: string[]
   phase: 'loading' | 'done' | 'error'
   error?: string
+  savedId?: string   // set when already saved in DB
+}
+
+export type DeepSearchEntry = {
+  id: string
+  term: string
+  video_title: string | null
+  analysis_id: string | null
+  result: Omit<DeepSearchResult, 'phase' | 'error' | 'savedId'>
+  created_at: string
 }

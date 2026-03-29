@@ -45,8 +45,9 @@ function SonekerNode({ data }: NodeProps) {
           background: colors.bg,
           border: `${nodeData.isRoot ? '1.8' : '1.2'}px solid ${colors.stroke}`,
           borderRadius: 8,
-          padding: nodeData.isRoot ? '8px 18px' : '6px 14px',
-          minWidth: nodeData.isRoot ? 120 : 90,
+          padding: nodeData.isRoot ? '8px 14px' : '6px 12px',
+          minWidth: nodeData.isRoot ? 100 : 80,
+          maxWidth: nodeData.isRoot ? 160 : 140,
           textAlign: 'center',
           cursor: 'pointer',
           transition: 'filter 0.15s',
@@ -58,14 +59,20 @@ function SonekerNode({ data }: NodeProps) {
         <div style={{
           fontFamily: 'var(--font-syne, Syne, sans-serif)',
           fontWeight: nodeData.isRoot ? 700 : 600,
-          fontSize: nodeData.isRoot ? 11.5 : 10.5,
+          fontSize: nodeData.isRoot ? 11 : 10,
           color: colors.text,
-          lineHeight: 1.3,
+          lineHeight: 1.35,
+          wordBreak: 'break-word',
+          overflowWrap: 'break-word',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
         }}>
           {nodeData.label}
         </div>
         {nodeData.sublabel && (
-          <div style={{ fontSize: 8, color: colors.stroke, opacity: 0.75, marginTop: 2 }}>
+          <div style={{ fontSize: 7.5, color: colors.stroke, opacity: 0.7, marginTop: 2 }}>
             {nodeData.sublabel}
           </div>
         )}
@@ -82,80 +89,83 @@ const nodeTypes = { soneker: SonekerNode }
 function buildFlowData(concepts: MapConceptRaw[]): { nodes: Node[]; edges: Edge[] } {
   if (!concepts.length) return { nodes: [], edges: [] }
 
+  const conceptMap = new Map(concepts.map(c => [c.id, c]))
   const root = concepts.find(c => c.isRoot) ?? concepts[0]
-  const level1Ids = new Set(root.connections ?? [])
-  const level1 = concepts.filter(c => c.id !== root.id && level1Ids.has(c.id)).slice(0, 5)
 
-  const level2Map = new Map<string, MapConceptRaw[]>()
-  level1.forEach(l1 => {
-    const children = concepts.filter(c =>
-      c.id !== root.id &&
-      !level1Ids.has(c.id) &&
-      l1.connections?.includes(c.id)
-    ).slice(0, 2)
-    if (children.length) level2Map.set(l1.id, children)
+  // ── Assign levels via BFS from root ──────────────────────────────────────
+  const levelMap = new Map<string, number>()
+  const queue: string[] = [root.id]
+  levelMap.set(root.id, 0)
+  while (queue.length) {
+    const current = queue.shift()!
+    const concept = conceptMap.get(current)
+    const currentLevel = levelMap.get(current) ?? 0
+    for (const childId of concept?.connections ?? []) {
+      if (!levelMap.has(childId) && conceptMap.has(childId)) {
+        levelMap.set(childId, currentLevel + 1)
+        queue.push(childId)
+      }
+    }
+  }
+  // Orphan concepts (not reachable from root) get level 2
+  concepts.forEach(c => { if (!levelMap.has(c.id)) levelMap.set(c.id, 2) })
+
+  // ── Group by level ────────────────────────────────────────────────────────
+  const byLevel = new Map<number, string[]>()
+  levelMap.forEach((level, id) => {
+    if (!byLevel.has(level)) byLevel.set(level, [])
+    byLevel.get(level)!.push(id)
   })
 
-  const nodes: Node[] = []
-  const edges: Edge[] = []
+  // ── Position nodes ────────────────────────────────────────────────────────
+  const SPACING_X = 210
+  const SPACING_Y = 150
+  const positionMap = new Map<string, { x: number; y: number }>()
 
-  // Root node — center top
-  nodes.push({
-    id: root.id,
+  byLevel.forEach((ids, level) => {
+    const totalW = (ids.length - 1) * SPACING_X
+    ids.forEach((id, i) => {
+      positionMap.set(id, { x: i * SPACING_X - totalW / 2, y: level * SPACING_Y })
+    })
+  })
+
+  // ── Build nodes ───────────────────────────────────────────────────────────
+  const nodes: Node[] = concepts.map(c => ({
+    id: c.id,
     type: 'soneker',
-    position: { x: 0, y: 0 },
-    data: { label: root.label, category: root.category ?? 'central', isRoot: true, sublabel: 'conceito central' },
-  })
+    position: positionMap.get(c.id) ?? { x: 0, y: 0 },
+    data: {
+      label: c.label,
+      category: c.category ?? 'concept',
+      isRoot: c.isRoot ?? false,
+      sublabel: c.isRoot ? 'conceito central' : c.category,
+    },
+  }))
 
-  // Level 1 — spread horizontally below root
-  const l1SpacingX = 200
-  const l1StartX = -(l1SpacingX * (level1.length - 1)) / 2
+  // ── Build edges (deduplicated) ────────────────────────────────────────────
+  const edgeSet = new Set<string>()
+  const edges: Edge[] = []
+  const isRoot = (id: string) => id === root.id
 
-  level1.forEach((c, i) => {
-    const x = l1StartX + i * l1SpacingX
-    nodes.push({
-      id: c.id,
-      type: 'soneker',
-      position: { x, y: 140 },
-      data: { label: c.label, category: c.category, sublabel: c.category },
-    })
-
-    const label = root.connectionLabels?.[c.id]
-    const colors = CATEGORY_COLORS[c.category] ?? CATEGORY_COLORS.concept
-    edges.push({
-      id: `e-${root.id}-${c.id}`,
-      source: root.id,
-      target: c.id,
-      label,
-      type: 'smoothstep',
-      markerEnd: { type: MarkerType.ArrowClosed, color: colors.stroke, width: 12, height: 12 },
-      style: { stroke: colors.stroke, strokeWidth: 1, strokeOpacity: 0.5 },
-      labelStyle: { fontSize: 8, fill: '#40405a' },
-      labelBgStyle: { fill: 'transparent' },
-    })
-
-    // Level 2 — below each l1 node
-    const l2Children = level2Map.get(c.id) ?? []
-    l2Children.forEach((l2, j) => {
-      const l2x = x + (j - (l2Children.length - 1) / 2) * 130
-      nodes.push({
-        id: l2.id,
-        type: 'soneker',
-        position: { x: l2x, y: 270 },
-        data: { label: l2.label, category: l2.category, sublabel: l2.category },
-      })
-
-      const l2Colors = CATEGORY_COLORS[l2.category] ?? CATEGORY_COLORS.concept
-      const l2label = c.connectionLabels?.[l2.id]
+  concepts.forEach(c => {
+    (c.connections ?? []).forEach(targetId => {
+      if (!conceptMap.has(targetId)) return
+      const edgeKey = `${c.id}→${targetId}`
+      if (edgeSet.has(edgeKey)) return
+      edgeSet.add(edgeKey)
+      const target = conceptMap.get(targetId)!
+      const colors = CATEGORY_COLORS[target.category] ?? CATEGORY_COLORS.concept
+      const label = c.connectionLabels?.[targetId]
+      const isRootEdge = isRoot(c.id)
       edges.push({
-        id: `e-${c.id}-${l2.id}`,
+        id: `e-${c.id}-${targetId}`,
         source: c.id,
-        target: l2.id,
-        label: l2label,
+        target: targetId,
+        label,
         type: 'smoothstep',
-        markerEnd: { type: MarkerType.ArrowClosed, color: l2Colors.stroke, width: 10, height: 10 },
-        style: { stroke: l2Colors.stroke, strokeWidth: 0.9, strokeOpacity: 0.4, strokeDasharray: '4 3' },
-        labelStyle: { fontSize: 7.5, fill: '#40405a' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: colors.stroke, width: isRootEdge ? 12 : 10, height: isRootEdge ? 12 : 10 },
+        style: { stroke: colors.stroke, strokeWidth: isRootEdge ? 1.2 : 0.9, strokeOpacity: isRootEdge ? 0.6 : 0.4, ...(isRootEdge ? {} : { strokeDasharray: '4 3' }) },
+        labelStyle: { fontSize: isRootEdge ? 8 : 7.5, fill: '#40405a' },
         labelBgStyle: { fill: 'transparent' },
       })
     })
@@ -164,14 +174,79 @@ function buildFlowData(concepts: MapConceptRaw[]): { nodes: Node[]; edges: Edge[
   return { nodes, edges }
 }
 
+// ── Fallback: synthesise map from cards when mapConcepts is empty ─────────────
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function shortLabel(name: string): string {
+  // Remove subtitle after separators — keep only the primary concept name
+  const primary = name.split(/\s*[—–:·]\s*/)[0].trim()
+  // If still long, limit to 4 words
+  const words = primary.split(' ')
+  return words.length > 4 ? words.slice(0, 4).join(' ') : primary
+}
+
+const ROLE_BY_SECTION: Record<string, string> = {
+  resumo:      'entry point',
+  conceitual:  'core mechanism',
+  estrategico: 'core mechanism',
+  pragmatico:  'result',
+  playbook:    'result',
+  validacao:   'measure',
+  analitico:   'measure',
+  erros:       'blocker',
+  contextos:   'blocker',
+  derivado:    'catalyst',
+  mentalidade: 'catalyst',
+  marketing:   'enabler',
+  negocio:     'enabler',
+}
+
+function synthesiseFromCards(cards: import('@/types').KnowledgeCard[]): MapConceptRaw[] {
+  if (!cards.length) return []
+
+  const resumo = cards.find(c => c.section === 'resumo') ?? cards[0]
+  const rest = cards.filter(c => c.id !== resumo.id).slice(0, 8)
+
+  const root: MapConceptRaw = {
+    id: resumo.id,
+    label: shortLabel(resumo.name),
+    category: 'central',
+    isRoot: true,
+    connections: rest.map(c => c.id),
+    connectionLabels: Object.fromEntries(rest.map(c => [c.id, 'enables'])),
+    role: 'entry point',
+    centralQuestion: stripHtml(resumo.body).slice(0, 120),
+  }
+
+  const children: MapConceptRaw[] = rest.map(c => ({
+    id: c.id,
+    label: shortLabel(c.name),
+    category: c.category,
+    isRoot: false,
+    connections: [],
+    connectionLabels: {},
+    role: ROLE_BY_SECTION[c.section] ?? 'concept',
+    centralQuestion: c.action ?? stripHtml(c.body).slice(0, 100),
+  }))
+
+  return [root, ...children]
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function KnowledgeMap() {
   const { result, triggerDeepSearch } = useApp()
   const [activeNode, setActiveNode] = useState<NodeData | null>(null)
 
-  // Use real mapConcepts; synthesize from cards if absent (should not happen post-analysis)
-  const concepts = result?.mapConcepts ?? []
+  // Use real mapConcepts; fallback to cards-based synthesis when absent
+  const concepts = useMemo(() => {
+    if (result?.mapConcepts?.length) return result.mapConcepts
+    if (result?.cards?.length) return synthesiseFromCards(result.cards)
+    return []
+  }, [result?.mapConcepts, result?.cards])
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () => buildFlowData(concepts),
@@ -202,9 +277,17 @@ export default function KnowledgeMap() {
         id: concept.id,
         title: concept.label,
         category: concept.category === 'central' ? 'concept' : concept.category,
-        definition: concept.definition ?? `Conceito central: ${concept.label}`,
-        points: concept.keyPoints ?? ['Conceito extraído pelo Soneker', 'Relacionado com o tema principal'],
-        relatedTags: concept.connections?.map(id => concepts.find(c => c.id === id)?.label ?? id) ?? [],
+        role: concept.role ?? 'concept',
+        centralQuestion: concept.centralQuestion ?? '',
+        connections: (concept.connections ?? [])
+          .map(id => {
+            const target = concepts.find(c => c.id === id)
+            return target ? {
+              label: target.label,
+              relationship: concept.connectionLabels?.[id] ?? '→',
+            } : null
+          })
+          .filter((x): x is { label: string; relationship: string } => x !== null),
       })
     }
   }, [concepts, activeNode])
@@ -270,25 +353,28 @@ export default function KnowledgeMap() {
         <div className="node-detail show">
           <div className="nd-head">
             <span className="nd-badge" style={getCategoryBadgeStyle(activeNode.category)}>
-              {activeNode.category}
+              {activeNode.role}
             </span>
             <button className="nd-close" onClick={() => setActiveNode(null)}>×</button>
           </div>
           <div className="nd-body">
             <div className="nd-title">{activeNode.title}</div>
-            <div className="nd-def">{activeNode.definition}</div>
-            <div className="nd-sec">Pontos chave</div>
-            <div className="nd-pts">
-              {activeNode.points.map((pt, i) => (
-                <div className="nd-pt" key={i}>{pt}</div>
-              ))}
-            </div>
-            {activeNode.relatedTags.length > 0 && (
+            {activeNode.centralQuestion && (
               <>
-                <div className="nd-sec">Conceitos relacionados</div>
-                <div className="nd-tags">
-                  {activeNode.relatedTags.map((tag, i) => (
-                    <span className="nd-tag" key={i}>{tag}</span>
+                <div className="nd-sec">Questão central</div>
+                <div className="nd-def">{activeNode.centralQuestion}</div>
+              </>
+            )}
+            {activeNode.connections.length > 0 && (
+              <>
+                <div className="nd-sec">Relações no sistema</div>
+                <div className="nd-pts">
+                  {activeNode.connections.map((conn, i) => (
+                    <div className="nd-pt" key={i}>
+                      <span style={{ color: 'var(--text3)', fontSize: 11 }}>{conn.relationship}</span>
+                      {' '}
+                      <span style={{ fontWeight: 600 }}>{conn.label}</span>
+                    </div>
                   ))}
                 </div>
               </>

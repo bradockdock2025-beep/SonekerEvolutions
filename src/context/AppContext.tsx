@@ -24,11 +24,14 @@ interface AppContextType {
   // Deep search
   deepSearch: DeepSearchResult | null
   triggerDeepSearch: (term: string) => void
+  openSavedDeepSearch: (entry: import('@/types').DeepSearchEntry) => void
   closeDeepSearch: () => void
+  saveDeepSearch: () => Promise<void>
+  isSavingDeepSearch: boolean
   // Library
   loadSavedAnalysis: (id: string) => void
-  saveAnalysis: () => Promise<void>
-  savedId: string | null   // ID of the saved analysis (null = not saved yet)
+  saveAnalysis: () => Promise<string | null>
+  savedId: string | null
   isSaving: boolean
   // Map
   addConceptToMap: (term: string) => void
@@ -52,9 +55,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isSaving, setIsSaving] = useState(false)
 
   const [deepSearch, setDeepSearch] = useState<DeepSearchResult | null>(null)
+  const [isSavingDeepSearch, setIsSavingDeepSearch] = useState(false)
 
-  const triggerDeepSearch = (term: string) => {
+  const triggerDeepSearch = async (term: string) => {
     setDeepSearch({ term, title: term, summary: '', points: [], examples: [], related: [], phase: 'loading' })
+
+    try {
+      // Check DB cache first
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const cacheUrl = new URL('/api/deep-search/save', window.location.origin)
+      cacheUrl.searchParams.set('term', term)
+      if (savedId) cacheUrl.searchParams.set('analysisId', savedId)
+      const cacheRes = await fetch(cacheUrl.toString(), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (cacheRes.ok) {
+        const cacheData = await cacheRes.json()
+        if (cacheData.found && cacheData.result) {
+          const r = cacheData.result
+          setDeepSearch({
+            term,
+            title:    typeof r.title   === 'string' ? r.title   : term,
+            summary:  typeof r.summary === 'string' ? r.summary : '',
+            points:   Array.isArray(r.points)   ? r.points   : [],
+            examples: Array.isArray(r.examples) ? r.examples : [],
+            related:  Array.isArray(r.related)  ? r.related  : [],
+            phase: 'done',
+            savedId: cacheData.id,
+          })
+          return
+        }
+      }
+    } catch { /* ignore cache errors, proceed to Claude */ }
+
+    // Not cached — call Claude
     fetch('/api/deep-search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -78,18 +113,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       })
   }
 
+  const openSavedDeepSearch = (entry: import('@/types').DeepSearchEntry) => {
+    const r = entry.result
+    setDeepSearch({
+      term:     entry.term,
+      title:    typeof r.title   === 'string' ? r.title   : entry.term,
+      summary:  typeof r.summary === 'string' ? r.summary : '',
+      points:   Array.isArray(r.points)   ? r.points   : [],
+      examples: Array.isArray(r.examples) ? r.examples : [],
+      related:  Array.isArray(r.related)  ? r.related  : [],
+      phase:    'done',
+      savedId:  entry.id,
+    })
+  }
+
   const closeDeepSearch = () => setDeepSearch(null)
+
+  const saveDeepSearch = async () => {
+    if (!deepSearch || deepSearch.phase !== 'done' || deepSearch.savedId) return
+    setIsSavingDeepSearch(true)
+    try {
+      // Ensure the main analysis is saved first and capture the id synchronously
+      let currentAnalysisId = savedId
+      if (result && !currentAnalysisId) {
+        currentAnalysisId = await saveAnalysis()
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const res = await fetch('/api/deep-search/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          term:       deepSearch.term,
+          videoTitle: result?.videoTitle ?? null,
+          analysisId: currentAnalysisId ?? null,
+          result: {
+            title:    deepSearch.title,
+            summary:  deepSearch.summary,
+            points:   deepSearch.points,
+            examples: deepSearch.examples,
+            related:  deepSearch.related,
+          },
+        }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      const data = await res.json()
+      setDeepSearch(prev => prev ? { ...prev, savedId: data.id } : null)
+    } finally {
+      setIsSavingDeepSearch(false)
+    }
+  }
 
   const addConceptToMap = (term: string) => {
     if (!result) return
     const root = result.mapConcepts.find(c => c.isRoot) ?? result.mapConcepts[0]
-    const newConcept = {
+    const newConcept: import('@/types').MapConceptRaw = {
       id: `user-${Date.now()}`,
       label: term.slice(0, 32),
-      category: 'concept' as const,
+      category: 'concept',
       isRoot: false,
       connections: [],
-      definition: t('app_concept_manual', { term }),
+      connectionLabels: {},
+      role: 'concept',
+      centralQuestion: t('app_concept_manual', { term }),
     }
     const updatedRoot = root
       ? { ...root, connections: [...(root.connections ?? []), newConcept.id] }
@@ -103,8 +193,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  const saveAnalysis = async () => {
-    if (!result) return
+  const saveAnalysis = async (): Promise<string | null> => {
+    if (!result) return null
     setIsSaving(true)
     try {
       const { data: sessionData } = await supabase.auth.getSession()
@@ -123,12 +213,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           niche:        result.niche,
           nicheId:      result.nicheId,
           cardCount:    result.cards.length,
+          language,
           result,
         }),
       })
       if (!res.ok) throw new Error('Save failed')
       const data = await res.json()
-      setSavedId(data.id ?? null)
+      const id = data.id ?? null
+      setSavedId(id)
+      return id
     } finally {
       setIsSaving(false)
     }
@@ -221,7 +314,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       selection, setSelection,
       result, analysisError, analysisReady,
       startAnalysis,
-      deepSearch, triggerDeepSearch, closeDeepSearch,
+      deepSearch, triggerDeepSearch, openSavedDeepSearch, closeDeepSearch, saveDeepSearch, isSavingDeepSearch,
       saveAnalysis, loadSavedAnalysis, savedId, isSaving,
       addConceptToMap,
     }}>
