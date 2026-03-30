@@ -80,8 +80,16 @@ export const AnalysisResponseSchema = z.object({
   videoTitle: z.string(),
   niche: z.string(),
   cards: z.array(KnowledgeCardSchema).min(4).max(22),
-  vocabulary: z.array(VocabEntrySchema).catch([]).transform(
-    items => items.filter(v => v.term.length > 0)
+  vocabulary: z.preprocess(
+    val => {
+      if (!Array.isArray(val) || val.length === 0) {
+        console.error('[vocabulary] Claude returned invalid or empty vocabulary:', JSON.stringify(val))
+      }
+      return val
+    },
+    z.array(VocabEntrySchema).catch([]).transform(
+      items => items.filter(v => v.term.length > 0)
+    )
   ),
   mapConcepts: z.array(MapConceptSchema).catch([]),
 })

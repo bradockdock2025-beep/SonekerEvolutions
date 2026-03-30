@@ -220,9 +220,13 @@ The user should be able to read the cards in order and feel like they went from 
 ${coreList}
 ${blockedList}
 
-## VOCABULARY
-5-8 terms. For each term:
-- Definition: explain it as a practitioner would — "in practice, this means X"
+## VOCABULARY — ALWAYS REQUIRED (non-negotiable, regardless of niche or card sections)
+You MUST always populate the "vocabulary" array with 5-8 terms. This field is mandatory in every analysis, for every niche. Never return an empty array. Never skip this field.
+
+Extract domain-specific terms that appear in this content — technical terms, frameworks named, jargon used, or concepts that have a specific meaning in this niche context.
+
+For each term:
+- Definition: explain it as a practitioner would — "in practice, this means X" — not a dictionary definition
 - 3 points: each point is a practical consequence of understanding this term — what the user can now do or decide that they couldn't before
 
 ## CONCEPTUAL MAP — THE STRATEGIC ARCHITECTURE
