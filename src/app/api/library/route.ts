@@ -74,6 +74,36 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ id: data.id })
 }
 
+export async function DELETE(req: NextRequest) {
+  const sbUser = await getUserFromRequest(req)
+  if (!sbUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+  // Cascade: delete all linked deep searches first (children before parent)
+  const { error: deepError } = await supabaseAdmin
+    .from('deep_searches')
+    .delete()
+    .eq('analysis_id', id)
+    .eq('user_id', sbUser.id)
+
+  if (deepError) {
+    console.error('Cascade deep_searches delete error:', deepError.message)
+    return NextResponse.json({ error: deepError.message }, { status: 500 })
+  }
+
+  // Delete the analysis itself
+  const { error } = await supabaseAdmin
+    .from('analyses')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', sbUser.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
 export async function GET(req: NextRequest) {
   const sbUser = await getUserFromRequest(req)
   if (!sbUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -468,7 +468,7 @@ body {
 .cc-body { max-height: 0; overflow: hidden; transition: max-height .35s cubic-bezier(.4,0,.2,1); }
 .cc.open .cc-body { max-height: 900px; }
 .cc-inner { padding: 14px 16px 16px; border-top: 1px solid var(--border); }
-.k-text { font-size: 15px; color: var(--text); line-height: 1.8; }
+.k-text { font-size: 15px; color: var(--text2); line-height: 1.8; }
 .k-name { font-size: 16px; font-weight: 700; display: block; margin-bottom: 8px; letter-spacing: -.01em; }
 .k-tags { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 5px; }
 .k-tag { font-size: 12px; padding: 3px 10px; border-radius: 100px; background: var(--bg3); border: 1px solid var(--border); color: var(--text3); }
@@ -504,9 +504,9 @@ mark.ma { background: rgba(196,125,10,.10); color: var(--insight); }
   margin-top: 1px;
 }
 .card-action-text {
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--text);
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text2);
   font-weight: 500;
 }
 .btn-deep { height: 28px; padding: 0 12px; font-size: 11.5px; font-family: var(--font-b); font-weight: 500; background: transparent; border: 1px solid var(--border2); border-radius: var(--rxs); color: var(--text2); cursor: pointer; transition: all var(--tr); display: inline-flex; align-items: center; gap: 4px; }
@@ -642,6 +642,25 @@ mark.ma { background: rgba(196,125,10,.10); color: var(--insight); }
 .collapsible-grid { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s cubic-bezier(0.4, 0, 0.2, 1); }
 .collapsible-grid.open { grid-template-rows: 1fr; }
 .collapsible-inner { overflow: hidden; }
+
+/* Delete button */
+.lib-delete-btn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--rxs); border: none; background: transparent; color: var(--text3); cursor: pointer; transition: background var(--tr), color var(--tr); flex-shrink: 0; }
+.lib-delete-btn:hover { background: rgba(220,38,38,.12); color: #dc2626; }
+
+/* Delete confirm modal */
+@keyframes delFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes delSlideUp { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.del-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; animation: delFadeIn .15s ease; }
+.del-modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--r); padding: 28px 24px 24px; max-width: 380px; width: 100%; box-shadow: var(--shadow-md); animation: delSlideUp .18s cubic-bezier(0.4,0,0.2,1); }
+.del-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(220,38,38,.1); border: 1px solid rgba(220,38,38,.2); display: flex; align-items: center; justify-content: center; color: #dc2626; margin-bottom: 16px; }
+.del-icon svg { width: 18px; height: 18px; }
+.del-title { font-family: var(--font-h); font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; letter-spacing: -.02em; }
+.del-desc { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 24px; }
+.del-actions { display: flex; gap: 8px; }
+.del-btn-cancel { flex: 1; padding: 9px; border-radius: var(--rsm); border: 1px solid var(--border2); background: var(--bg3); color: var(--text2); font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--font-b); transition: background var(--tr); }
+.del-btn-cancel:hover { background: var(--bg4); }
+.del-btn-confirm { flex: 1; padding: 9px; border-radius: var(--rsm); border: none; background: #dc2626; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font-b); transition: background var(--tr); }
+.del-btn-confirm:hover { background: #b91c1c; }
 
 /* Explorations section embedded in analysis card */
 .lib-exp-divider { height: 1px; background: var(--border); margin: 12px 0 0; }

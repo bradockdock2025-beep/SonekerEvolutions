@@ -240,16 +240,17 @@ RULES — CRITICAL:
 - Every node = a position in the strategic system
 - Every edge = a precise causal or structural relationship
 
-Generate 6-10 concept nodes:
+Generate 7-10 concept nodes:
 - Exactly 1 root node (isRoot: true) — the central strategic challenge or principle that everything else depends on
-- 5-9 nodes representing key positions in the system
-- Root MUST have at least 4 connections
-- Every other node MUST have at least 1 connection
+- 6-9 nodes representing key positions in the system
+- Root MUST have at least 5 connections
+- Every other node MUST have at least 2 connections — nodes with only 1 connection are not allowed
+- Aim for a dense, interconnected graph: non-root nodes should connect to each other, not only to the root
 
 For each node:
 - label: 1-3 words maximum — the concept name, short and clear
 - role: exactly ONE of: "entry point" | "core mechanism" | "enabler" | "blocker" | "result" | "measure" | "catalyst"
-- centralQuestion: The ONE question this concept answers within the system. NOT a definition — a question that reveals its function. GOOD: "How do you reach the right audience at scale?" BAD: "Distribution means getting your product to users."
+- centralQuestion: MANDATORY. The ONE question this concept answers within the system. STRICT RULES: (1) Must be a question — it MUST end with "?". (2) Must start with a question word in the output language: "Como", "O que", "Por que", "Quando", "Qual", "Quais", "Onde", "How", "What", "Why", "When", "Which". (3) Must NOT be a definition. (4) Must NOT be empty. GOOD: "Como descobres o que precisa de ser construído antes de o construíres?" BAD: "Conversas diárias significa falar com clientes regularmente." If you cannot derive a question, write: "Como esta ideia muda o que deves fazer a seguir?"
 - connections: array of IDs this node connects TO
 - connectionLabels: for EVERY connection, a precise relationship verb — exactly one of: "activates" | "requires" | "produces" | "measures" | "challenges" | "enables" | "depends on" | "accelerates" | "validates" | "replaces"`
 }
@@ -329,7 +330,7 @@ export const TOOL_SCHEMA = {
       },
       mapConcepts: {
         type: 'array',
-        minItems: 6,
+        minItems: 7,
         maxItems: 10,
         description: 'MANDATORY. The strategic architecture of the content — NOT a summary of cards. Shows how concepts relate as a system.',
         items: {
@@ -343,7 +344,7 @@ export const TOOL_SCHEMA = {
             connections: { type: 'array', items: { type: 'string' }, description: 'IDs of concepts this node connects TO. Root needs 4+. Others need at least 1.' },
             connectionLabels: { type: 'object', additionalProperties: { type: 'string' }, description: 'A relationship verb for EVERY connection ID. Must use exactly one of: "activates", "requires", "produces", "measures", "challenges", "enables", "depends on", "accelerates", "validates", "replaces"' },
             role: { type: 'string', enum: ['entry point', 'core mechanism', 'enabler', 'blocker', 'result', 'measure', 'catalyst'], description: 'The structural role this concept plays in the system.' },
-            centralQuestion: { type: 'string', description: 'The ONE question this concept answers within the system. NOT a definition — a question. GOOD: "How do you reach the right audience at scale?" BAD: "Distribution means getting your product to users."' },
+            centralQuestion: { type: 'string', description: 'MANDATORY. The ONE question this concept answers in the system. Must end with "?". Must start with a question word (Como, O que, Por que, Quando, Qual, How, What, Why, etc.). Never a definition. Never empty. GOOD: "Como descobres o que precisa de ser construído antes de o construíres?" BAD: "Conversas diárias significa falar com clientes."' },
           },
         },
       },

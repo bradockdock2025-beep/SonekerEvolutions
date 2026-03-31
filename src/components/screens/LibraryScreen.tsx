@@ -27,16 +27,26 @@ function ChevronIcon() {
   )
 }
 
+function TrashIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+      <path d="M2 3.5h9M5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M10.5 3.5l-.6 7a.5.5 0 0 1-.5.5H3.6a.5.5 0 0 1-.5-.5l-.6-7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 function OrphanGroup({
   title,
   items,
   locale,
   onOpen,
+  onDelete,
 }: {
   title: string
   items: DeepSearchEntry[]
   locale: string
   onOpen: (entry: DeepSearchEntry) => void
+  onDelete: (e: React.MouseEvent, id: string) => void
 }) {
   const [open, setOpen] = useState(false)
 
@@ -67,9 +77,19 @@ function OrphanGroup({
               >
                 <div className="lib-ds-top">
                   <span className="lib-ds-badge">AI Deep Search</span>
-                  <span className="lib-ds-date">
-                    {new Date(entry.created_at).toLocaleDateString(locale, { day: '2-digit', month: 'short' })}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="lib-ds-date">
+                      {new Date(entry.created_at).toLocaleDateString(locale, { day: '2-digit', month: 'short' })}
+                    </span>
+                    <button
+                      className="lib-delete-btn"
+                      onClick={e => onDelete(e, entry.id)}
+                      aria-label="Remover pesquisa"
+                      title="Remover pesquisa"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
                 </div>
                 <div className="lib-ds-term">{entry.term}</div>
                 {entry.result?.summary && (
@@ -124,6 +144,30 @@ function ExplorationSection({
   )
 }
 
+interface DeleteModal {
+  title: string
+  description: string
+  onConfirm: () => void
+}
+
+function ConfirmModal({ modal, onClose }: { modal: DeleteModal; onClose: () => void }) {
+  return (
+    <div className="del-overlay" onClick={onClose}>
+      <div className="del-modal" onClick={e => e.stopPropagation()}>
+        <div className="del-icon">
+          <TrashIcon />
+        </div>
+        <div className="del-title">{modal.title}</div>
+        <div className="del-desc">{modal.description}</div>
+        <div className="del-actions">
+          <button className="del-btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className="del-btn-confirm" onClick={() => { modal.onConfirm(); onClose() }}>Remover</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function LibraryScreen() {
   const { setScreen, loadSavedAnalysis, openSavedDeepSearch } = useApp()
   const { t, locale } = useLanguage()
@@ -132,6 +176,7 @@ export default function LibraryScreen() {
   const [loading, setLoading] = useState(true)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [tab, setTab] = useState<'analyses' | 'searches'>('analyses')
+  const [deleteModal, setDeleteModal] = useState<DeleteModal | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -168,6 +213,45 @@ export default function LibraryScreen() {
     loadSavedAnalysis(id)
   }
 
+  const handleDeleteAnalysis = (e: React.MouseEvent, id: string, videoTitle: string) => {
+    e.stopPropagation()
+    const linkedCount = (deepByAnalysis[id] ?? []).length
+    const description = linkedCount > 0
+      ? `Isto irá remover "${videoTitle}" e as suas ${linkedCount} pesquisa${linkedCount > 1 ? 's' : ''} guardada${linkedCount > 1 ? 's' : ''}. Esta acção não pode ser desfeita.`
+      : `Isto irá remover "${videoTitle}" da biblioteca. Esta acção não pode ser desfeita.`
+    setDeleteModal({
+      title: 'Remover análise?',
+      description,
+      onConfirm: async () => {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData.session?.access_token
+        await fetch(`/api/library?id=${id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        setEntries(prev => prev.filter(e => e.id !== id))
+        setDeepEntries(prev => prev.filter(e => e.analysis_id !== id))
+      },
+    })
+  }
+
+  const handleDeleteDeepSearch = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    setDeleteModal({
+      title: 'Remover pesquisa?',
+      description: 'Esta pesquisa guardada será removida permanentemente. Esta acção não pode ser desfeita.',
+      onConfirm: async () => {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData.session?.access_token
+        await fetch(`/api/deep-search/list?id=${id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        setDeepEntries(prev => prev.filter(e => e.id !== id))
+      },
+    })
+  }
+
   const handleOpenDeepSearch = (entry: DeepSearchEntry) => {
     // Load the linked analysis first so the result screen has context
     if (entry.analysis_id) {
@@ -184,6 +268,7 @@ export default function LibraryScreen() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)' }}>
+      {deleteModal && <ConfirmModal modal={deleteModal} onClose={() => setDeleteModal(null)} />}
       <div className="lib-top">
         <div className="tb-logo">
           <div className="tb-dot" />
@@ -262,7 +347,17 @@ export default function LibraryScreen() {
                         }
                       </div>
                     </div>
-                    <div className="lib-card-t">{entry.video_title}</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+                      <div className="lib-card-t" style={{ flex: 1 }}>{entry.video_title}</div>
+                      <button
+                        className="lib-delete-btn"
+                        onClick={e => handleDeleteAnalysis(e, entry.id, entry.video_title)}
+                        aria-label="Remover análise"
+                        title="Remover da biblioteca"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
                     <div className="lib-meta">
                       <span className="lib-chan">{entry.channel}</span>
                       <span className="lib-cnt">{entry.card_count} {t('lib_extracted')}</span>
@@ -313,6 +408,7 @@ export default function LibraryScreen() {
                       items={group.items}
                       locale={locale}
                       onOpen={handleOpenDeepSearch}
+                      onDelete={handleDeleteDeepSearch}
                     />
                   ))}
                 </div>

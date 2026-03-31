@@ -273,24 +273,63 @@ export default function KnowledgeMap() {
     if (activeNode?.id === node.id) {
       setActiveNode(null)
     } else {
+      // Outgoing: connections this node declares
+      const outgoing = (concept.connections ?? [])
+        .map(id => {
+          const target = concepts.find(c => c.id === id)
+          return target ? {
+            label: target.label,
+            relationship: concept.connectionLabels?.[id] ?? '→',
+          } : null
+        })
+        .filter((x): x is { label: string; relationship: string } => x !== null)
+
+      // Incoming: connections from other nodes that point TO this node
+      const incoming = concepts
+        .filter(c => c.id !== concept.id && (c.connections ?? []).includes(concept.id))
+        .map(c => ({
+          label: c.label,
+          relationship: `← ${c.connectionLabels?.[concept.id] ?? 'connects to'}`,
+        }))
+
+      // Merge, deduplicate by label
+      const seen = new Set<string>()
+      const allConnections = [...outgoing, ...incoming].filter(c => {
+        if (seen.has(c.label)) return false
+        seen.add(c.label)
+        return true
+      })
+
       setActiveNode({
         id: concept.id,
         title: concept.label,
         category: concept.category === 'central' ? 'concept' : concept.category,
         role: concept.role ?? 'concept',
         centralQuestion: concept.centralQuestion ?? '',
-        connections: (concept.connections ?? [])
-          .map(id => {
-            const target = concepts.find(c => c.id === id)
-            return target ? {
-              label: target.label,
-              relationship: concept.connectionLabels?.[id] ?? '→',
-            } : null
-          })
-          .filter((x): x is { label: string; relationship: string } => x !== null),
+        connections: allConnections,
       })
     }
   }, [concepts, activeNode])
+
+  // Ensure centralQuestion is actually a question — fallback if Claude returned a definition
+  const QUESTION_WORDS = /^(como|o que|por que|porque|quando|qual|quais|onde|how|what|why|when|which|who)/i
+  const sanitiseCentralQuestion = (q: string, role: string): string => {
+    if (!q?.trim()) return ''
+    if (q.endsWith('?') && QUESTION_WORDS.test(q.trim())) return q
+    // Looks like a definition — wrap it as a question or discard
+    if (q.endsWith('?')) return q  // has ? even if no question word — keep it
+    return ''  // definition without ?, don't show
+  }
+
+  const ROLE_LABELS: Record<string, string> = {
+    'entry point':    'Ponto de entrada — onde o sistema começa',
+    'core mechanism': 'Mecanismo central — como o sistema funciona',
+    'enabler':        'Habilitador — o que torna o sistema possível',
+    'blocker':        'Bloqueador — o que impede o sistema de funcionar',
+    'result':         'Resultado — o que o sistema produz',
+    'measure':        'Medida — como se avalia o sistema',
+    'catalyst':       'Catalisador — o que acelera o sistema',
+  }
 
   const getCategoryBadgeStyle = (category: string) => {
     const colors = CATEGORY_COLORS[category] ?? CATEGORY_COLORS.concept
@@ -358,13 +397,28 @@ export default function KnowledgeMap() {
             <button className="nd-close" onClick={() => setActiveNode(null)}>×</button>
           </div>
           <div className="nd-body">
-            <div className="nd-title">{activeNode.title}</div>
-            {activeNode.centralQuestion && (
-              <>
-                <div className="nd-sec">Questão central</div>
-                <div className="nd-def">{activeNode.centralQuestion}</div>
-              </>
-            )}
+            {(() => {
+              const question = sanitiseCentralQuestion(activeNode.centralQuestion, activeNode.role)
+              const roleDesc = ROLE_LABELS[activeNode.role]
+              return (
+                <>
+                  {question && (
+                    <>
+                      <div className="nd-sec">Questão</div>
+                      <div className="nd-def">{question}</div>
+                    </>
+                  )}
+                  <div className="nd-sec">Resposta</div>
+                  <div className="nd-title">{activeNode.title}</div>
+                  {roleDesc && (
+                    <>
+                      <div className="nd-sec" style={{ marginTop: 10 }}>Papel no sistema</div>
+                      <div className="nd-def" style={{ fontSize: 11.5, opacity: 0.8 }}>{roleDesc}</div>
+                    </>
+                  )}
+                </>
+              )
+            })()}
             {activeNode.connections.length > 0 && (
               <>
                 <div className="nd-sec">Relações no sistema</div>
